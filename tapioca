@@ -18,7 +18,6 @@ get_term() {
 	echo "$columns"
 }
 
-
 setup_term() {
 	default_settings=$(stty -g)
 
