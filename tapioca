@@ -1,0 +1,221 @@
+#!/usr/bin/env sh
+
+trap 'restore_term' EXIT
+
+# Setup functions
+
+get_term() {
+	count=1
+	for word in $(stty size)
+	do
+		case "$count" in
+			1) lines="$word" ;;
+			2) columns="$word" ;;
+		esac
+		count=$((count+1))
+	done
+	echo "$lines"
+	echo "$columns"
+}
+
+
+setup_term() {
+	default_settings=$(stty -g)
+
+	print_escape '[?1049h'  # Switch buffer
+	print_escape '[22t'     # Save window name + icon
+
+	print_escape '[?2004h'  # Bracketed paste
+	print_escape '[?7l'     # Disable line wrapping
+	print_escape '[?25l'    # Hide cursor
+	print_escape ']0;tapioca' # Window title
+	clear
+	stty -icanon # So we can read one at a time
+	#stty -ixon # Disable XON/XOFF
+	stty -echo # Dont echo user input
+	#stty intr '' # Unbind sigint, normally ctrl-c
+}
+
+restore_term() {
+	print_escape '[?1049l'  # Switch buffer
+	print_escape '[23t'     # Restore window name + icon
+	print_escape '[?25h'    # Show cursor
+	stty "$default_settings"
+}
+
+# Interface functions
+
+print_escape() {
+	printf '\033%s' "$1"
+}
+
+go_to() {
+	if [ -z "$2" ]
+	then
+		temp="[$1H"
+	else
+		temp="[$1;$2H"
+	fi
+	print_escape "$temp"
+}
+
+getch() {
+	key=''
+	temp=''
+
+	esc=$(print_escape)
+	bsp=$(printf '\177')
+	new=$(printf '\n')
+	tab=$(printf '\t')
+
+	while [ -z "$key" ]
+	do
+		char=$(dd ibs=1 count=1 2>/dev/null)
+		temp="$temp$char"
+		case "$temp" in
+			"$esc"*) esc_decode "$temp" ;;
+			"$bsp") key='backspace' ;;
+			"$new") key='newline' ;;
+			"$tab") key='tab' ;;
+			' ') key='space' ;;
+			[[:print:]]) key="$char" ;;
+			[[:cntrl:]]) key='ctrl+unknown' ;;
+			*) key='unknown' ;;
+		esac
+	done
+}
+
+esc_decode() {
+	code="$*"
+	dec_temp=''
+	case "$code" in
+		*';2'*) dec_temp='shift+' ;;
+		*';3'*) dec_temp='alt+' ;;
+		*';4'*) dec_temp='alt+shift+' ;;
+		*';5'*) dec_temp='ctrl+' ;;
+		*';6'*) dec_temp='ctrl+shift+' ;;
+		*';7'*) dec_temp='ctrl+alt+' ;;
+		*';8'*) dec_temp='ctrl+alt+shift' ;;
+	esac
+	
+	case "$code" in
+		$esc'['*'A')  key="$dec_temp""up" ;;
+		$esc'['*'B')  key="$dec_temp""down" ;;
+		$esc'['*'C')  key="$dec_temp""right" ;;
+		$esc'['*'D')  key="$dec_temp""left" ;;
+		$esc'['*'F')  key="$dec_temp""end" ;;
+		$esc'['*'H')  key="$dec_temp""home" ;;
+		$esc'[2'*'~') key="$dec_temp""insert" ;;
+		$esc'[3'*'~') key="$dec_temp""delete" ;;
+		$esc'[5'*'~') key="$dec_temp""pageup" ;;
+		$esc'[6'*'~') key="$dec_temp""pagedn" ;;
+	esac
+
+	if [ -z "$key" ] && [ "${#code}" -gt 6 ]
+	then
+		key='unknown'
+	fi
+}
+
+landing_page() {
+	logo=$(cat <<-EOF
+${red} .. ... . ${end}
+${yel}##########${end}
+${gre}\________/${end}
+ \______/
+	EOF
+	)
+
+	# Welcome
+	go_to "$(( ( lines / 2 ) - 4 ))" "$(( ( columns / 2 ) - 8 ))"
+	printf "%s${yel}%s${end}\n" 'welcome to ' 'tapioca'
+
+	# System + shell
+	cursh=$(ps | grep $$)
+	for word in $cursh
+	do
+		case "$word" in
+			*sh) cursh="$word" ;;
+		esac
+	done
+	cursh="running under $cursh"
+
+	case "$(uname -a)" in
+		Linux*)   cursh="$cursh on linux"  ;;
+		Darwin*)  cursh="$cursh on macos"  ;;
+		OpenBSD*) cursh="$cursh on openbsd";;
+		FreeBSD*) cursh="$cursh on freebsd";;
+		*) cursh="$cursh on unknown" ;;
+	esac
+	go_to "$(( ( lines / 2 ) - 3 ))" "$(( ( columns / 2 ) - ( ${#cursh} / 2 ) ))"
+	count=1
+	for word in $cursh
+	do
+		case "$count" in
+			3) printf "${blu}%s${end} " "$word" ;;
+			5) printf "${red}%s${end} " "$word" ;;
+			*) printf "%s " "$word" ;;
+		esac
+		count="$((count+1))"
+	done
+
+	# logo
+	count=1
+	echo "$logo" | while IFS= read -r line
+	do
+		go_to "$(( ( lines / 2 ) - 2 + count ))" "$(( ( columns / 2 ) - 5 ))"
+		echo "$line"
+		count="$((count+1))"
+	done
+	read -r _
+}
+
+# Editing
+
+editing_mode() {
+	main_running=true
+	while [ "$main_running" = true ]
+	do
+		#draw_text
+		getch
+		case "$key" in
+			[Qq]) main_running=false ;;
+			*) bottom_bar " $key" ;;
+		esac
+	done
+}
+
+draw_text() {
+	go_to 1
+	echo "$text_buffer" | while IFS= read -r line
+	do
+		echo "$line"
+	done
+}
+
+bottom_bar() {
+	go_to "$lines"
+	printf "$inv%-*s$end" "$columns" "$@"
+}
+
+# Colors
+
+inv=$(print_escape '[7m')
+red=$(print_escape '[31m')
+gre=$(print_escape '[32m')
+yel=$(print_escape '[33m')
+blu=$(print_escape '[34m')
+end=$(print_escape '[0m')
+
+get_term
+setup_term
+
+if [ -f "$*" ]
+then
+	text_buffer=$(cat "$*")
+	editing_mode
+else
+	landing_page
+fi
+
+restore_term
