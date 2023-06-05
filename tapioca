@@ -195,7 +195,7 @@ editing_mode() {
 	key='' # Just so it doesnt crash first time drawing bar
 	while [ "$main_running" = true ]
 	do
-		bottom_bar " $key $curl $curc $topl $tlen"
+		bottom_bar " $file_name $key $curl $curc $topl $tlen"
 		( draw_text )
 		print_escape '[?25h'
 		getch
@@ -203,6 +203,7 @@ editing_mode() {
 		case "$key" in
 			'ctrl+'[Qq]) main_running=false ;;
 			'ctrl+'[Oo]) open_new ;;
+			'ctrl+'[Ss]) save_ask ;;
 			'up')   curl=$(( curl - 1 )) ;;
 			'down') curl=$(( curl + 1 )) ;;
 			'left') curc=$(( curc - 1 )) ;;
@@ -249,27 +250,41 @@ editing_mode() {
 	done
 }
 
+save_ask() {
+	saving=false
+	bottom_bar " Save (y/n)?"
+	getch
+	case "$key" in
+		[Yy]) saving=true ;;
+		*) ;;
+	esac
+	if [ "$saving" = true ]
+	then
+		echo "$text_buffer" > "$file_name"
+	fi
+}
+
 open_new() {
 	opening=true
 	open_temp=''
 	while [ "$opening" = true ]
 	do
-		go_to "$lines"
-		printf "${inv}%-*s" "$columns" " Open: $open_temp"
+		bottom_bar " Open: $open_temp"
 		getch
 		case "$key" in
 			[[:print:]]) open_temp="$open_temp$key" ;;
 			'backspace') open_temp="${open_temp%?}" ;;
 			'newline') opening=false ;;
 		esac
-		open_file "$open_temp"
 	done
+	open_file "$open_temp"
 }
 
 open_file() {
 	open_temp="$1"
 	if [ -f "$open_temp" ]
 	then
+		file_name="$open_temp"
 		text_buffer=$(cat "$open_temp")
 		curl=1
 		curc=1
