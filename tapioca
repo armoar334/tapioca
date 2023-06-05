@@ -195,7 +195,8 @@ editing_mode() {
 			'newline')
 				newline 
 				curc=0
-				curl=$((curl+1)) ;;
+				curl=$((curl+1))
+				tlen=$((tlen+1)) ;;
 			'backspace')
 				delete
 				curc=$((curc-1)) ;;
@@ -294,6 +295,7 @@ delete() {
 			count=$((count+1))
 		done
 		)
+		tlen=$((tlen-1))
 	else
 		text_buffer=$(
 		count=1
@@ -350,6 +352,7 @@ then
 	editing_mode
 else
 	landing_page
+	text_buffer=' '
 	editing_mode
 fi
 
