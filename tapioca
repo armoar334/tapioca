@@ -93,26 +93,28 @@ esc_decode() {
 	code="$*"
 	dec_temp=''
 	case "$code" in
-		*';2'*) dec_temp='shift+' ;;
-		*';3'*) dec_temp='alt+' ;;
-		*';4'*) dec_temp='alt+shift+' ;;
-		*';5'*) dec_temp='ctrl+' ;;
-		*';6'*) dec_temp='ctrl+shift+' ;;
-		*';7'*) dec_temp='ctrl+alt+' ;;
-		*';8'*) dec_temp='ctrl+alt+shift' ;;
-	esac
-	
-	case "$code" in
-		$esc'['*'A')  key="$dec_temp""up" ;;
-		$esc'['*'B')  key="$dec_temp""down" ;;
-		$esc'['*'C')  key="$dec_temp""right" ;;
-		$esc'['*'D')  key="$dec_temp""left" ;;
-		$esc'['*'F')  key="$dec_temp""end" ;;
-		$esc'['*'H')  key="$dec_temp""home" ;;
-		$esc'[2'*'~') key="$dec_temp""insert" ;;
-		$esc'[3'*'~') key="$dec_temp""delete" ;;
-		$esc'[5'*'~') key="$dec_temp""pageup" ;;
-		$esc'[6'*'~') key="$dec_temp""pagedn" ;;
+		*[A-Z]|*'~') # Only process when code is done
+		case "$code" in
+			*';2'*) dec_temp='shift+' ;;
+			*';3'*) dec_temp='alt+' ;;
+			*';4'*) dec_temp='alt+shift+' ;;
+			*';5'*) dec_temp='ctrl+' ;;
+			*';6'*) dec_temp='ctrl+shift+' ;;
+			*';7'*) dec_temp='ctrl+alt+' ;;
+			*';8'*) dec_temp='ctrl+alt+shift' ;;
+		esac
+		case "$code" in
+			$esc'['*'A')  key="$dec_temp""up" ;;
+			$esc'['*'B')  key="$dec_temp""down" ;;
+			$esc'['*'C')  key="$dec_temp""right" ;;
+			$esc'['*'D')  key="$dec_temp""left" ;;
+			$esc'['*'F')  key="$dec_temp""end" ;;
+			$esc'['*'H')  key="$dec_temp""home" ;;
+			$esc'[2'*'~') key="$dec_temp""insert" ;;
+			$esc'[3'*'~') key="$dec_temp""delete" ;;
+			$esc'[5'*'~') key="$dec_temp""pageup" ;;
+			$esc'[6'*'~') key="$dec_temp""pagedn" ;;
+		esac ;;
 	esac
 
 	if [ -z "$key" ] && [ "${#code}" -gt 6 ]
@@ -184,7 +186,7 @@ editing_mode() {
 	main_running=true
 	while [ "$main_running" = true ]
 	do
-		( echo "$text_buffer" | draw_text )
+		( draw_text )
 		draw_curs
 		getch
 		case "$key" in
@@ -214,7 +216,6 @@ editing_mode() {
 			$(( topl + ( lines - 1 ) > tlen )) ) topl=$(( tlen - ( lines - 1 ) )) ;;
 		esac
 
-		key=$(echo "$key" | cat -v)
 		bottom_bar " $key $curl $curc $topl $tlen"
 	done
 }
@@ -231,17 +232,20 @@ line_count() {
 draw_text() (
 	go_to 1
 	count=1
-	until [ "$count" -ge "$topl" ]
+	until [ "$count" -gt "$topl" ]
 	do
-		text_buffer="${text_buffer#${new}}"
+		text_buffer="${text_buffer#"${new}"}"
 		count=$((count+1))
 	done
 	count=1
-	echo "$text_buffer" | while [ "$count" -le $(( topl + ( lines - 2 ) )) ] && IFS= read -r line
+	echo "$text_buffer" | while [ "$count" -lt $(( topl + ( lines - 1 ) )) ] && IFS= read -r line
 	do
-		print_escape '[K'
-		printf "${inv}%*s${end} " 3 "$count"
-		printf '%s\n' "$line"
+		if [ "$count" -ge "$topl" ]
+		then
+			print_escape '[2K'
+			printf "${inv}%*s${end} " 3 "$count"
+			printf '%s\n' "$line"
+		fi
 		count="$((count+1))"
 	done
 )
