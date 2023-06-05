@@ -146,9 +146,11 @@ landing_page() {
 
 	case "$(uname -a)" in
 		Linux*)   cursh="$cursh on linux"  ;;
-		Darwin*)  cursh="$cursh on macos"  ;;
+		Darwin*)  cursh="$cursh on macOS"  ;;
 		OpenBSD*) cursh="$cursh on openbsd";;
 		FreeBSD*) cursh="$cursh on freebsd";;
+		Serenity) cursh="$cursh on serenityOS" ;;
+		Plan9*)   cursh="$cursh on plan9" ;; # This ones a little optimistic
 		*) cursh="$cursh on unknown" ;;
 	esac
 	go_to "$(( ( lines / 2 ) - 3 ))" "$(( ( columns / 2 ) - ( ${#cursh} / 2 ) ))"
