@@ -24,5 +24,6 @@ The best performance I have found comes from running under busybox ash
 
 ## Tested under
  - bash, dash, ash, zsh: Runs fast and fine
+ - ksh93: mostly works, except ctrl character decoding is broken so cant quit or open new file
  - oksh: works, but unusably slow
  - yash: doesnt have ```printf '%*s'```, will work soon
