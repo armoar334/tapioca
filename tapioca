@@ -185,13 +185,23 @@ editing_mode() {
 		draw_curs
 		getch
 		case "$key" in
-			[Qq]) main_running=false ;;
+			'ctrl+'[Qq]) main_running=false ;;
 			'up')   curl=$(( curl - 1 )) ;;
 			'down') curl=$(( curl + 1 )) ;;
 			'left') curc=$(( curc - 1 )) ;;
 			'right')curc=$(( curc + 1 )) ;;
 			'pageup') curl="$(( curl - ( lines - 1 ) ))" ;;
 			'pagedn') curl="$(( curl + ( lines - 1 ) ))" ;;
+			'newline')
+				newline 
+				curc=0
+				curl=$((curl+1)) ;;
+			'backspace')
+				delete
+				curc=$((curc-1)) ;;
+			[[:print:]])
+				insert "$key"
+				curc=$((curc+1)) ;;
 			*) ;;
 		esac
 
@@ -215,8 +225,8 @@ editing_mode() {
 
 		
 		# Scroll sanitize
-		#if [ $(( topl + ( lines - 1 ) > tlen )) ]; then topl=$(( tlen - ( lines - 1 ) )); fi
-		#if [ $(( topl < 1 )) ]; then topl=1; fi
+		if [ $(( topl + ( lines - 1 ) )) -ge  "$tlen" ]; then topl=$(( tlen - ( lines - 1 ) )); fi
+		if [ "$topl" -lt 1 ]; then topl=1; fi
 
 		bottom_bar " $key $curl $curc $topl $tlen"
 	done
@@ -248,7 +258,73 @@ draw_text() (
 
 draw_curs() {
 	go_to "$(( ( curl - topl ) + 1 ))" "$(( curc + 4 ))"
-	printf "${red}%s${end}" H
+	printf "${red}%s${end}" 'H'
+}
+
+insert() {
+	inschar="$1"
+	text_buffer=$(
+	count=1
+	echo "$text_buffer" | while IFS= read -r line
+	do
+		if [ "$count" -eq "$curl" ];
+		then
+			echo "$line" | sed 's/^\(.\{'$((curc-1))'\}\)/\1'"$inschar"'/'
+		else
+			echo "$line"
+		fi
+		count=$((count+1))
+	done
+	)	
+}
+
+delete() {
+	if [ "$curc" -le 1 ]; 
+	then
+		text_buffer=$(
+		count=1
+		echo "$text_buffer" | while IFS= read -r line
+		do
+			if [ "$count" -eq "$((curl-1))" ];
+			then
+				printf '%*s' 0 "$line"
+			else
+				echo "$line"
+			fi
+			count=$((count+1))
+		done
+		)
+	else
+		text_buffer=$(
+		count=1
+		echo "$text_buffer" | while IFS= read -r line
+		do
+			if [ "$count" -eq "$curl" ];
+			then
+				echo "$line" | sed 's/.//'$((curc-1))''
+			else
+				echo "$line"
+			fi
+			count=$((count+1))
+		done
+		)
+	fi
+}
+
+newline() {
+	text_buffer=$(
+	count=1
+	echo "$text_buffer" | while IFS= read -r line
+	do
+		if [ "$count" -eq "$curl" ];
+		then
+			echo "$line" | sed 's/^\(.\{'$((curc-1))'\}\)/\1\n/'
+		else
+			echo "$line"
+		fi
+		count=$((count+1))
+	done
+	)	
 }
 
 bottom_bar() {
