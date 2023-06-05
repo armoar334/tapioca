@@ -312,7 +312,7 @@ line_count() (
 draw_text() (
 	go_to 1
 	count=1
-	printf '%s\n' "$text_buffer" | while [ "$count" -lt $(( topl + ( lines - 1 ) )) ] && IFS= read -r line
+	printf '%s' "$text_buffer" | while [ "$count" -lt $(( topl + ( lines - 1 ) )) ] && IFS= read -r line
 	do
 		if [ "$count" -ge "$topl" ]
 		then
