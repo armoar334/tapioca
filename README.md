@@ -13,6 +13,8 @@ The best performance I have found comes from running under busybox ash
 ## Rules
  - Replace as many external utilities as possible with pure shell, for speed. ```sh``` is slow, calling externals is slower.
  - Nothing too far out of support from the most basic terminals. I.e no 256 color, no xterm mouse support, nothing that wouldnt work on a real vt100 (or vt200, thats probably more reasonable) WITH THE SINGLE EXCEPTION of brackted paste
+ - No shell specific workaround! no testing for shell for any reason other than to show on the landing page, if something doesnt work on one shell, make it work on all shells
+
 
 ## Basic keybinds
  - Arrows to move around
