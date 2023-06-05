@@ -187,6 +187,7 @@ editing_mode() {
 		print_escape '[?25l'
 		case "$key" in
 			'ctrl+'[Qq]) main_running=false ;;
+			'ctrl+'[Oo]) open_file ;;
 			'up')   curl=$(( curl - 1 )) ;;
 			'down') curl=$(( curl + 1 )) ;;
 			'left') curc=$(( curc - 1 )) ;;
@@ -234,6 +235,32 @@ editing_mode() {
 	done
 }
 
+open_file() {
+	opening=true
+	open_temp=''
+	while [ "$opening" = true ]
+	do
+		go_to "$lines"
+		printf "${inv}%-*s" "$columns" " Open: $open_temp"
+		getch
+		case "$key" in
+			[[:print:]]) open_temp="$open_temp$key" ;;
+			'backspace') open_temp="${open_temp%?}" ;;
+			'newline') opening=false ;;
+		esac
+	done
+	if [ -f "$open_temp" ]
+	then
+		text_buffer=$(cat "$open_temp")
+		curl=1
+		curc=1
+		topl=1
+		tlen=$(echo "$text_buffer" | line_count)
+	else
+		bottom_bar "File $open_temp not found or not file"
+	fi
+}
+
 line_count() {
 	count=0
 	while IFS= read -r line
@@ -261,6 +288,16 @@ draw_text() (
 		fi
 		count="$((count+1))"
 	done
+	if [ "$tlen" -lt $(( lines - 1 )) ]
+	then
+		count="$tlen"
+		until [ "$count" -eq $(( lines - 1)) ]
+		do
+			print_escape '[K'
+			echo
+			count=$((count+1))
+		done
+	fi
 	print_escape '8'
 )
 
