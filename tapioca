@@ -320,7 +320,12 @@ newline() {
 	do
 		if [ "$count" -eq "$curl" ];
 		then
-			echo "$line" | sed 's/^\(.\{'$((curc-1))'\}\)/\1\n/'
+			if [ -z "$line" ];
+			then
+				echo ''
+			else
+				echo "$line" | sed 's/^\(.\{'$((curc-1))'\}\)/\1\n/'
+			fi
 		else
 			echo "$line"
 		fi
@@ -352,7 +357,7 @@ then
 	editing_mode
 else
 	landing_page
-	text_buffer=' '
+	#text_buffer=' '
 	editing_mode
 fi
 
