@@ -14,8 +14,6 @@ get_term() {
 		esac
 		count=$((count+1))
 	done
-	echo "$lines"
-	echo "$columns"
 }
 
 setup_term() {
