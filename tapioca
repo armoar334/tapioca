@@ -138,6 +138,7 @@ ${blu} \______/ ${end}
 	# System + shell
 	cursh=$(ps | grep $$)
 	cursh="${cursh##* }"
+	if [ -h "$(which $cursh)" ]; then cursh="$cursh:($(readlink $(which $cursh)))"; fi
 	cursh="running under $cursh"
 
 	case "$(uname -a)" in
@@ -199,6 +200,11 @@ editing_mode() {
 		case 1 in
 			$(( curl < 1 )) ) curl=1 ;;
 			$(( curl > tlen )) ) curl="$tlen" ;;
+		esac
+
+		# Curc sanitize
+		case 1 in
+			$(( curc < 1 )) ) curc=1 ;;
 		esac
 
 		# Scroll check
