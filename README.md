@@ -21,3 +21,8 @@ The best performance I have found comes from running under busybox ash
  - Home and End go to the start and end of a file respectively
  - PageUp / PageDown go up and down by the current height of the display
  - ctrl+q to quit
+
+## Tested under
+ - bash, dash, ash, zsh: Runs fast and fine
+ - oksh: works, but unusably slow
+ - yash: doesnt have ```printf '%*s'```, will work soon
