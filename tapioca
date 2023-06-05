@@ -30,9 +30,9 @@ setup_term() {
 	print_escape ']0;tapioca' # Window title
 	clear
 	stty -icanon # So we can read one at a time
-	#stty -ixon # Disable XON/XOFF
+	stty -ixon # Disable XON/XOFF
 	stty -echo # Dont echo user input
-	#stty intr '' # Unbind sigint, normally ctrl-c
+	stty intr '' # Unbind sigint, normally ctrl-c
 }
 
 restore_term() {
@@ -78,6 +78,11 @@ getch() {
 			"$tab") key='tab' ;;
 			' ') key='space' ;;
 			[[:print:]]) key="$char" ;;
+			[[:cntrl:]])
+				key=$(( $(printf '%d' \'"$temp") + 64 ))
+				key=$( printf '%03o' "$key")
+				true \'
+				key='ctrl+'$( printf '%b' '\'"$key");;
 			[[:cntrl:]]) key='ctrl+unknown' ;;
 			*) key='unknown' ;;
 		esac
@@ -166,30 +171,84 @@ ${gre}\________/${end}
 		echo "$line"
 		count="$((count+1))"
 	done
-	read -r _
 }
 
 # Editing
 
 editing_mode() {
+	curl=1
+	curc=1
+	topl=1
+	tlen=$(echo "$text_buffer" | line_count)
+
 	main_running=true
 	while [ "$main_running" = true ]
 	do
-		#draw_text
+		( echo "$text_buffer" | draw_text )
+		draw_curs
 		getch
 		case "$key" in
 			[Qq]) main_running=false ;;
-			*) bottom_bar " $key" ;;
+			'up')   curl=$(( curl - 1 )) ;;
+			'down') curl=$(( curl + 1 )) ;;
+			'left') curc=$(( curc - 1 )) ;;
+			'right')curc=$(( curc + 1 )) ;;
+			'pageup') curl="$(( curl - ( lines - 1 ) ))" ;;
+			'pagedn') curl="$(( curl + ( lines - 1 ) ))" ;;
+			*) ;;
 		esac
+
+		# This is maybe not portable but it works well enough so
+		case 1 in
+			$(( curl < 1 )) ) curl=1 ;;
+			$(( curl > tlen )) ) curl="$(( tlen - 1 ))" ;;
+		esac
+
+		case 1 in
+			$(( ( curl - topl ) < 0 )) ) topl="$curl" ;;
+			$(( ( curl - topl ) > ( lines - 2 ) )) ) topl=$(( curl - ( lines - 2 ) )) ;;
+		esac
+
+		case 1 in
+			$(( topl < 0 )) ) topl=0 ;;
+			$(( topl + ( lines - 1 ) > tlen )) ) topl=$(( tlen - ( lines - 1 ) )) ;;
+		esac
+
+		key=$(echo "$key" | cat -v)
+		bottom_bar " $key $curl $curc $topl $tlen"
 	done
 }
 
-draw_text() {
-	go_to 1
-	echo "$text_buffer" | while IFS= read -r line
+line_count() {
+	count=0
+	while IFS= read -r line
 	do
-		echo "$line"
+		count=$((count+1))
 	done
+	echo "$count"
+}
+
+draw_text() (
+	go_to 1
+	count=1
+	until [ "$count" -ge "$topl" ]
+	do
+		text_buffer="${text_buffer#${new}}"
+		count=$((count+1))
+	done
+	count=1
+	echo "$text_buffer" | while [ "$count" -le $(( topl + ( lines - 2 ) )) ] && IFS= read -r line
+	do
+		print_escape '[K'
+		printf "${inv}%*s${end} " 3 "$count"
+		printf '%s\n' "$line"
+		count="$((count+1))"
+	done
+)
+
+draw_curs() {
+	go_to "$(( ( curl - topl ) + 1 ))" "$(( curc + 4 ))"
+	printf "${red}%s${end}" H
 }
 
 bottom_bar() {
@@ -215,6 +274,7 @@ then
 	editing_mode
 else
 	landing_page
+	editing_mode
 fi
 
 restore_term
