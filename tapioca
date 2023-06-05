@@ -139,7 +139,10 @@ landing_page() {
 	# System + shell
 	cursh=$(ps | grep $$)
 	cursh="${cursh##* }"
-	if [ -h "$(which $cursh)" ]; then cursh="$cursh:($(readlink $(which $cursh)))"; fi
+	if [ -h "$(which $cursh)" ];
+	then
+		cursh="$(readlink $(which $cursh))"
+	fi
 	cursh="running under $cursh"
 
 	case "$(uname -a)" in
