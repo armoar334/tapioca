@@ -83,7 +83,6 @@ getch() {
 				key=$( printf '%03o' "$key")
 				true \'
 				key='ctrl+'$( printf '%b' '\'"$key");;
-			[[:cntrl:]]) key='ctrl+unknown' ;;
 			*) key='unknown' ;;
 		esac
 	done
@@ -128,7 +127,7 @@ landing_page() {
 ${red} .. ... . ${end}
 ${yel}##########${end}
 ${gre}\________/${end}
- \______/
+${blu} \______/ ${end}
 	EOF
 	)
 
@@ -201,20 +200,22 @@ editing_mode() {
 		esac
 
 		# This is maybe not portable but it works well enough so
+		# Curl sanitize
 		case 1 in
 			$(( curl < 1 )) ) curl=1 ;;
-			$(( curl > tlen )) ) curl="$(( tlen - 1 ))" ;;
+			$(( curl > tlen )) ) curl="$tlen" ;;
 		esac
 
+		# Scroll check
 		case 1 in
 			$(( ( curl - topl ) < 0 )) ) topl="$curl" ;;
 			$(( ( curl - topl ) > ( lines - 2 ) )) ) topl=$(( curl - ( lines - 2 ) )) ;;
 		esac
 
-		case 1 in
-			$(( topl < 0 )) ) topl=0 ;;
-			$(( topl + ( lines - 1 ) > tlen )) ) topl=$(( tlen - ( lines - 1 ) )) ;;
-		esac
+		
+		# Scroll sanitize
+		#if [ $(( topl + ( lines - 1 ) > tlen )) ]; then topl=$(( tlen - ( lines - 1 ) )); fi
+		#if [ $(( topl < 1 )) ]; then topl=1; fi
 
 		bottom_bar " $key $curl $curc $topl $tlen"
 	done
@@ -231,12 +232,6 @@ line_count() {
 
 draw_text() (
 	go_to 1
-	count=1
-	until [ "$count" -gt "$topl" ]
-	do
-		text_buffer="${text_buffer#"${new}"}"
-		count=$((count+1))
-	done
 	count=1
 	echo "$text_buffer" | while [ "$count" -lt $(( topl + ( lines - 1 ) )) ] && IFS= read -r line
 	do
