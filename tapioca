@@ -137,12 +137,7 @@ ${blu} \______/ ${end}
 
 	# System + shell
 	cursh=$(ps | grep $$)
-	for word in $cursh
-	do
-		case "$word" in
-			*sh) cursh="$word" ;;
-		esac
-	done
+	cursh="${cursh##* }"
 	cursh="running under $cursh"
 
 	case "$(uname -a)" in
@@ -154,7 +149,7 @@ ${blu} \______/ ${end}
 	esac
 	go_to "$(( ( lines / 2 ) - 3 ))" "$(( ( columns / 2 ) - ( ${#cursh} / 2 ) ))"
 	count=1
-	for word in $cursh
+	for word in $(echo $cursh)
 	do
 		case "$count" in
 			3) printf "${blu}%s${end} " "$word" ;;
