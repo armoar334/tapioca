@@ -182,8 +182,9 @@ editing_mode() {
 	while [ "$main_running" = true ]
 	do
 		( draw_text )
-		draw_curs
+		print_escape '[?25h'
 		getch
+		print_escape '[?25l'
 		case "$key" in
 			'ctrl+'[Qq]) main_running=false ;;
 			'up')   curl=$(( curl - 1 )) ;;
@@ -251,16 +252,18 @@ draw_text() (
 		then
 			print_escape '[2K'
 			printf "${inv}%*s${end} " 3 "$count"
-			printf '%s\n' "$line"
+			if [ "$count" -eq "$curl" ]
+			then
+				echo "$line" | sed 's/^\(.\{'$((curc-1))'\}\)/\1'$(print_escape '7')'/'
+			else
+				printf '%s\n' "$line"
+			fi
 		fi
 		count="$((count+1))"
 	done
+	print_escape '8'
 )
 
-draw_curs() {
-	go_to "$(( ( curl - topl ) + 1 ))" "$(( curc + 4 ))"
-	printf "${red}%s${end}" 'H'
-}
 
 insert() {
 	inschar="$1"
