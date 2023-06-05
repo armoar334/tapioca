@@ -193,11 +193,9 @@ editing_mode() {
 	key='' # Just so it doesnt crash first time drawing bar
 	while [ "$main_running" = true ]
 	do
-		( bottom_bar " $file_name $key $curl $curc $topl $tlen"
-		draw_text )
-		print_escape '[?25h'
+		printf '%s' "$( bottom_bar " $file_name $key $curl $curc $topl $tlen"
+		draw_text )"
 		getch
-		print_escape '[?25l'
 		case "$key" in
 			'ctrl+'[Qq]) main_running=false ;;
 			'ctrl+'[Oo]) open_ask ;;
@@ -218,6 +216,9 @@ editing_mode() {
 				curc=$((curc-1)) ;;
 			[[:print:]])
 				insert "$key"
+				curc=$((curc+1)) ;;
+			'space')
+				insert ' '
 				curc=$((curc+1)) ;;
 			*) ;;
 		esac
@@ -319,13 +320,27 @@ draw_text() (
 			printf "${inv}%*s${end} " 3 "$count"
 			if [ "$count" -eq "$curl" ]
 			then
-				printf '%s\n' "$line" | sed 's/^\(.\{'$((curc-1))'\}\)/\1'$(print_escape '7')'/'
+				temp="$(printf '%*s' $((curc-1)) | tr ' ' '?')"
+				p1="${line#""$temp""}"
+				p1="${line%"$p1"}"
+				
+				p2="${line#""$temp""}"
+
+				p3="${p2#?}"
+
+				temp="$(printf '%*s' $(( ${#p2} - 1 )) | tr ' ' '?')"
+				p2="${p2%""$temp""}"
+				case "$p2" in
+					'') printf '%s%s%s%s\n' "$p1" "${inv}" ' ' "${end}" ;;
+					"${tab}") printf '%s%s%s%s%s\n' "$p1" "${inv}" '    ' "${end}" "$p3" ;;
+					*) printf '%s%s%s%s%s\n' "$p1" "${inv}" "$p2" "${end}" "$p3" ;;
+				esac
 			else
 				printf '%s\n' "$line"
 			fi
 		fi
 		count="$((count+1))"
-	done
+	done | sed 's/\t/    /g'
 	if [ "$tlen" -lt $(( lines - 1 )) ]
 	then
 		count="$tlen"
