@@ -258,7 +258,7 @@ save_ask() {
 	esac
 	if [ "$saving" = true ]
 	then
-		printf '%*s\n' 0 "$text_buffer" > "$file_name"
+		printf '%s\n' "$text_buffer" > "$file_name"
 	fi
 }
 
@@ -293,7 +293,7 @@ open_file() {
 		curl=1
 		curc=1
 		topl=1
-		tlen=$(printf '%*s\n' 0 "$text_buffer" | line_count )
+		tlen=$(printf '%s\n' "$text_buffer" | line_count )
 	else
 		bottom_bar "File $open_temp not found or not file"
 	fi
@@ -311,7 +311,7 @@ line_count() (
 draw_text() (
 	go_to 1
 	count=1
-	printf '%*s\n' 0 "$text_buffer" | while [ "$count" -lt $(( topl + ( lines - 1 ) )) ] && IFS= read -r line
+	printf '%s\n' "$text_buffer" | while [ "$count" -lt $(( topl + ( lines - 1 ) )) ] && IFS= read -r line
 	do
 		if [ "$count" -ge "$topl" ]
 		then
@@ -319,9 +319,9 @@ draw_text() (
 			printf "${inv}%*s${end} " 3 "$count"
 			if [ "$count" -eq "$curl" ]
 			then
-				printf '%*s\n' 0 "$line" | sed 's/^\(.\{'$((curc-1))'\}\)/\1'$(print_escape '7')'/'
+				printf '%s\n' "$line" | sed 's/^\(.\{'$((curc-1))'\}\)/\1'$(print_escape '7')'/'
 			else
-				printf '%*s\n' 0 "$line"
+				printf '%s\n' "$line"
 			fi
 		fi
 		count="$((count+1))"
@@ -344,7 +344,7 @@ insert() {
 	inschar="$1"
 	text_buffer=$(
 	count=1
-	printf '%*s\n' 0 "$text_buffer" | while IFS= read -r line
+	printf '%s\n' "$text_buffer" | while IFS= read -r line
 	do
 		if [ "$count" -eq "$curl" ];
 		then
@@ -361,7 +361,7 @@ insert() {
 			done
 			echo
 		else
-			printf '%*s\n' 0 "$line"
+			printf '%s\n' "$line"
 		fi
 		count=$((count+1))
 	done
@@ -373,13 +373,13 @@ delete() {
 	then
 		text_buffer=$(
 		count=1
-		printf '%*s\n' 0 "$text_buffer" | while IFS= read -r line
+		printf '%s\n' "$text_buffer" | while IFS= read -r line
 		do
 			if [ "$count" -eq "$((curl-1))" ];
 			then
-				printf '%*s' 0 "$line"
+				printf '%s' "$line"
 			else
-				printf '%*s\n' 0 "$line"
+				printf '%s\n' "$line"
 			fi
 			count=$((count+1))
 		done
@@ -388,13 +388,13 @@ delete() {
 	else
 		text_buffer=$(
 		count=1
-		printf '%*s\n' 0 "$text_buffer" | while IFS= read -r line
+		printf '%s\n' "$text_buffer" | while IFS= read -r line
 		do
 			if [ "$count" -eq "$curl" ];
 			then
-				printf '%*s\n' 0 "$line" | sed 's/.//'$((curc-1))''
+				printf '%s\n' "$line" | sed 's/.//'$((curc-1))''
 			else
-				printf '%*s\n' 0 "$line"
+				printf '%s\n' "$line"
 			fi
 			count=$((count+1))
 		done
@@ -405,7 +405,7 @@ delete() {
 newline() {
 	text_buffer=$(
 	count=1
-	printf '%*s\n' 0 "$text_buffer" | while IFS= read -r line
+	printf '%s\n' "$text_buffer" | while IFS= read -r line
 	do
 		if [ "$count" -eq "$curl" ];
 		then
@@ -413,10 +413,10 @@ newline() {
 			then
 				echo ''
 			else
-				printf '%*s\n' 0 "$line" | sed 's/^\(.\{'$((curc-1))'\}\)/\1\n/'
+				printf '%s\n' "$line" | sed 's/^\(.\{'$((curc-1))'\}\)/\1\n/'
 			fi
 		else
-			printf '%*s\n' 0 "$line"
+			printf '%s\n' "$line"
 		fi
 		count=$((count+1))
 	done
