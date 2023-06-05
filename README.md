@@ -22,7 +22,9 @@ The best performance I have found comes from running under busybox ash
  - Delete, Backspace, Newline, Tab etc work as you would expect
  - Home and End go to the start and end of a file respectively
  - PageUp / PageDown go up and down by the current height of the display
- - ctrl+q to quit
+ - ctrl+Q to quit
+ - ctrl+O to open a new file
+ - ctrl+S to save
 
 ## Tested under
 ### Linux
