@@ -124,15 +124,18 @@ esc_decode() {
 
 landing_page() {
 	logo=$(cat <<-EOF
-${red} .. ... . ${end}
-${yel}##########${end}
-${gre}\________/${end}
-${blu} \______/ ${end}
+ ${yel} .. ... . ${end}
+ ${yel}##########${end}
+ ${end}\________/${end}
+ ${end} \______/ ${end}
+
+^O Open file
+  ^Q Quit
 	EOF
 	)
 
 	# Welcome
-	go_to "$(( ( lines / 2 ) - 4 ))" "$(( ( columns / 2 ) - 8 ))"
+	go_to "$(( ( lines / 2 ) - 4 ))" "$(( ( columns / 2 ) - 9 ))"
 	printf "%s${yel}%s${end}\n" 'welcome to ' 'tapioca'
 
 	# System + shell
@@ -168,26 +171,36 @@ ${blu} \______/ ${end}
 		echo "$line"
 		count="$((count+1))"
 	done
+	landing=true
+	while [ "$landing" = true ]
+	do
+		bottom_bar " welcome to tapioca!"
+		getch
+		case "$key" in
+			'ctrl+'[Qq]) landing=false ;;
+			'ctrl+'[Oo])
+				landing=false
+				open_new
+				editing_mode ;;
+		esac
+	done
 }
 
 # Editing
 
 editing_mode() {
-	curl=1
-	curc=1
-	topl=1
-	tlen=$(echo "$text_buffer" | line_count)
-
 	main_running=true
+	key='' # Just so it doesnt crash first time drawing bar
 	while [ "$main_running" = true ]
 	do
+		bottom_bar " $key $curl $curc $topl $tlen"
 		( draw_text )
 		print_escape '[?25h'
 		getch
 		print_escape '[?25l'
 		case "$key" in
 			'ctrl+'[Qq]) main_running=false ;;
-			'ctrl+'[Oo]) open_file ;;
+			'ctrl+'[Oo]) open_new ;;
 			'up')   curl=$(( curl - 1 )) ;;
 			'down') curl=$(( curl + 1 )) ;;
 			'left') curc=$(( curc - 1 )) ;;
@@ -231,11 +244,10 @@ editing_mode() {
 		if [ $(( topl + ( lines - 1 ) )) -ge  "$tlen" ]; then topl=$(( tlen - ( lines - 1 ) )); fi
 		if [ "$topl" -lt 1 ]; then topl=1; fi
 
-		bottom_bar " $key $curl $curc $topl $tlen"
 	done
 }
 
-open_file() {
+open_new() {
 	opening=true
 	open_temp=''
 	while [ "$opening" = true ]
@@ -248,7 +260,12 @@ open_file() {
 			'backspace') open_temp="${open_temp%?}" ;;
 			'newline') opening=false ;;
 		esac
+		open_file "$open_temp"
 	done
+}
+
+open_file() {
+	open_temp="$1"
 	if [ -f "$open_temp" ]
 	then
 		text_buffer=$(cat "$open_temp")
@@ -393,12 +410,10 @@ setup_term
 
 if [ -f "$*" ]
 then
-	text_buffer=$(cat "$*")
+	open_file "$*"
 	editing_mode
 else
 	landing_page
-	#text_buffer=' '
-	editing_mode
 fi
 
 restore_term
