@@ -363,13 +363,13 @@ insert() {
 			cunk=1
 			until [ -z "$line" ]
 			do
-				printf '%.1s' "$line"
-				line="${line#?}"
-				cunk=$(( cunk + 1 ))
 				if [ "$cunk" -eq "$curc" ]
 				then
 					printf '%s' "$inschar"
 				fi
+				printf '%.1s' "$line"
+				line="${line#?}"
+				cunk=$(( cunk + 1 ))
 			done
 			echo
 		else
