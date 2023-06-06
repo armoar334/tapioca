@@ -24,7 +24,7 @@ setup_term() {
 
 	print_escape '[?2004h'  # Bracketed paste
 	print_escape '[?7l'     # Disable line wrapping
-	print_escape '[?25l'    # Hide cursor
+	#print_escape '[?25l'    # Hide cursor
 	print_escape ']0;tapioca' # Window title
 	clear
 	stty -icanon # So we can read one at a time
@@ -137,9 +137,9 @@ landing_page() {
 	printf "%s${yel}%s${end}\n" 'welcome to ' 'tapioca'
 
 	# System + shell
-	cursh=$(ps | grep $$)
+	cursh=$(ps -p $$)
 	cursh="${cursh##* }"
-	if [ -h "$(which $cursh)" ];
+	if [ -h "$(which $cursh)" ]
 	then
 		cursh="$(readlink $(which $cursh))"
 	fi
@@ -329,15 +329,9 @@ draw_text() (
 				
 				p2="${line#""$temp""}"
 
-				p3="${p2#?}"
-
-				temp="$(printf '%*s' $(( ${#p2} - 1 )) | tr ' ' '?')"
-				p2="${p2%""$temp""}"
-				case "$p2" in
-					'') printf '%s%s%s%s\n' "$p1" "${inv}" ' ' "${end}" ;;
-					"${tab}") printf '%s%s%s%s%s\n' "$p1" "${inv}" '    ' "${end}" "$p3" ;;
-					*) printf '%s%s%s%s%s\n' "$p1" "${inv}" "$p2" "${end}" "$p3" ;;
-				esac
+				printf '%s' "$p1"
+				print_escape '7'
+				printf '%s\n' "$p2"
 			else
 				printf '%s\n' "$line"
 			fi
