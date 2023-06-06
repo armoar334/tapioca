@@ -362,12 +362,12 @@ insert() {
 			cunk=1
 			until [ -z "$line" ]
 			do
+				printf '%.1s' "$line"
+				line="${line#?}"
 				if [ "$cunk" -eq "$curc" ]
 				then
 					printf '%s' "$inschar"
 				fi
-				printf '%.1s' "$line"
-				line="${line#?}"
 				cunk=$(( cunk + 1 ))
 			done
 			echo
@@ -436,7 +436,7 @@ newline() {
 
 bottom_bar() {
 	go_to "$lines"
-	printf "$inv%-*s$end" "$columns" "$@"
+	printf "$inv%-*s$end" "$columns" "$*"
 }
 
 # Colors
