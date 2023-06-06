@@ -179,7 +179,7 @@ landing_page() {
 		bottom_bar " welcome to tapioca!"
 		getch
 		case "$key" in
-			'ctrl+'[Qq]) landing=false ;;
+			*[Qq]) landing=false ;;
 			'ctrl+'[Oo])
 				landing=false
 				open_ask
@@ -313,34 +313,31 @@ line_count() (
 
 draw_text() (
 	go_to 1
-	count=1
-	printf '%s' "$text_buffer" | while [ "$count" -lt $(( topl + ( lines - 1 ) )) ] && IFS= read -r line
+	count="$topl"
+	printf '%s' "$text_buffer" | sed -n "$topl"",$(( ( topl + lines ) - 2 ))p" | while [ "$count" -lt $(( topl + ( lines - 1 ) )) ] && IFS= read -r line
 	do
-		if [ "$count" -ge "$topl" ]
+		print_escape '[2K'
+		printf "${inv}%*s${end} " 3 "$count"
+		if [ "$count" -eq "$curl" ]
 		then
-			print_escape '[2K'
-			printf "${inv}%*s${end} " 3 "$count"
-			if [ "$count" -eq "$curl" ]
-			then
-				temp="$(printf '%*s' $((curc-1)) | tr ' ' '?')"
-				p1="${line#""$temp""}"
-				p1="${line%"$p1"}"
-				
-				p2="${line#""$temp""}"
+			temp="$(printf '%*s' $((curc-1)) | tr ' ' '?')"
+			p1="${line#""$temp""}"
+			p1="${line%"$p1"}"
+			
+			p2="${line#""$temp""}"
 
-				printf '%s' "$p1"
-				print_escape '7'
-				printf '%s\n' "$p2"
-			else
-				printf '%s\n' "$line"
-			fi
+			printf '%s' "$p1"
+			print_escape '7'
+			printf '%s\n' "$p2"
+		else
+			printf '%s\n' "$line"
 		fi
 		count="$((count+1))"
 	done | sed 's/\t/    /g'
 	if [ "$tlen" -lt $(( lines - 1 )) ]
 	then
 		count="$tlen"
-		until [ "$count" -eq $(( lines - 1)) ]
+		until [ "$(( count - topl ))" -eq $(( lines - 1)) ]
 		do
 			print_escape '[K'
 			echo
