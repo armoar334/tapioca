@@ -77,10 +77,9 @@ getch() {
 			' ') key='space' ;;
 			[[:print:]]) key="$char" ;;
 			[[:cntrl:]])
-				key=$(( $(printf '%d' \'"$temp") + 64 ))
+				key=$(( $(printf '%d' "'$temp") + 64 ))
 				key=$( printf '%03o' "$key")
-				true \'
-				key='ctrl+'$( printf '%b' '\'"$key");;
+				key='ctrl+'$( printf '\'"$key");;
 			*) key='unknown' ;;
 		esac
 	done
