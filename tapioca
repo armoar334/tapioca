@@ -1,4 +1,4 @@
-#!/usr/bin/env -S awk --posix -f
+#!/bin/awk -f
 
 function get_term() {
 	cmd = "stty size"
@@ -123,6 +123,10 @@ function esc_decode(temp) {
 			key = key"end"
 		else if ( temp ~ /H$/)
 			key = key"home"
+		else if ( temp ~ /\033\[200~$/)
+			key = "bracketpastebeg"
+		else if ( temp ~ /\033\[201~$/)
+			key = "bracketpasteend"
 		else if ( temp ~ /\[2.*~$/)
 			key = key"insert"
 		else if ( temp ~ /\[3.*~$/) 
@@ -241,6 +245,16 @@ function editing_mode(filename) {
 			line = substr(line, 0, curc)""key""substr(line, curc + 1)
 			text_buffer[curl] = line
 			curc += 1
+		}
+		else if ( key == "bracketpastebeg") {
+			pastetmp = ""
+			while ( key != "bracketpasteend" ) {
+				key = getch()
+				pastetmp = pastetmp""key
+			}
+			line = text_buffer[curl]
+			line = substr(line, 0, curc)""pastetmp""substr(line, curc + 1)
+			text_buffer[curl] = line
 		}
 
 		if ( curc < 0 ) {
