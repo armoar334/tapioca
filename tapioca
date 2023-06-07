@@ -67,12 +67,12 @@ function getch() {
 			key = "backspace"
 		else if ( temp ~ " " )
 			key = "space"
+		else if ( temp ~ /\t/ )
+			key = "tab"
 		else if ( temp ~ /[[:cntrl:]]/)
 			key = ctrl_decode(temp)
 		else if ( temp ~ /[[:print:]]/)
 			key = temp
-		else if ( temp ~ /\t/ )
-			key = "tab"
 		else if ( temp == "" )
 			key = "newline"
 	}
@@ -234,11 +234,16 @@ function editing_mode(filename) {
 			curl += lines - 2
 		else if ( key == "pageup" )
 			curl -= lines - 2
-
 		else if (key == "delete") {
 			line = text_buffer[curl]
 			line = substr(line, 0, curc)""substr(line, curc + 2)
 			text_buffer[curl] = line
+		}
+		else if (key == "tab") {
+			line = text_buffer[curl]
+			line = substr(line, 0, curc)""sprintf("\t")""substr(line, curc + 1)
+			text_buffer[curl] = line
+			curc += 1
 		}
 		else if (key ~ /^[[:print:]]$/) {
 			line = text_buffer[curl]
