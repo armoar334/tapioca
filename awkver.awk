@@ -227,8 +227,22 @@ function editing_mode(filename) {
 
 
 
-		if ( curc < 0 ) { curc = 0 }
-		if ( curc > length(text_buffer[curl]) ) { curc = length(text_buffer[curl]) }
+		if ( curc < 0 ) {
+			if ( curl > 1 ) {
+				curl -= 1
+				curc = length(text_buffer[curl])
+			}
+			else
+				curc = 0
+		}
+		if ( curc > length(text_buffer[curl]) ) {
+			if ( curl < tlen ) {
+				curl += 1
+				curc = 0
+			}
+			else
+				curc = length(text_buffer[curl])
+		}
 
 		if ( curl < 1 ) { curl = 1 }
 		if ( curl > tlen) { curl = tlen }
@@ -245,6 +259,9 @@ function draw_text() {
 	for(n=1;n<lines;n++) {
 		printf("\033[7m%*s\033[0m ", length(tlen), n + topl)
 		line = text_buffer[n + topl]
+		if ( length(line) > columns - length(tlen) + 1 ) {
+			line = substr(line, 0, columns - length(tlen) - 2 )""sprintf("\033[7m>\033[0m")
+		}
 		gsub(/\t/, "    ", line)
 		printf("%-*s\n", columns - length(tlen) - 1, line)
 	}
@@ -254,9 +271,9 @@ function draw_cursor() {
 	go_to(curl - topl)
 	printf("\033[7m%*s\033[0m ", length(tlen), curl)
 	line = text_buffer[curl]
-	line = substr(line, 0, curc )""sprintf("\033""7")""substr(line, curc + 1)
+	line = substr(line, 0, curc)""sprintf("\033""7")""substr(line, curc + 1)
 	gsub(/\t/, "    ", line)
-	printf("%-*s\n", columns - length(tlen) - 1, line)
+	printf("%-*s\n", columns - length(tlen) + 1, line)
 	printf("\033""8")
 }
 
