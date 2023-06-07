@@ -3,17 +3,15 @@
 
 ## Intro
 Tapioca is built to be as portable as possible out of the box, without sacrificing usability.
+tapioca.sh is the original, posix sh version, although it was too slow and inflexible to be brought up to standard. It is kept here for reference
 
 It was built to fill a space that doesn't really exist currently, in that there are two core concepts it fulfils:
  - The most portable software is interpreted, as it will then run on any architechture or standard implementation
- - The closest thing to a standard "interpreter" is posix sh ( although awk would be better, if not for the lack of being able to get a single character )
-
-The best performance I have found comes from running under busybox ash
+ - The closest thing to a standard "interpreter" is awk
 
 ## Rules
- - Replace as many external utilities as possible with pure shell, for speed. ```sh``` is slow, calling externals is slower.
  - Nothing too far out of support from the most basic terminals. I.e no 256 color, no xterm mouse support, nothing that wouldnt work on a real vt100 (or vt200, thats probably more reasonable) WITH THE SINGLE EXCEPTION of brackted paste
- - No shell specific workaround! no testing for shell for any reason other than to show on the landing page, if something doesnt work on one shell, make it work on all shells
+ - No implementation specific workaround! no testing for version for any reason other than to show on the landing page. Compatability, not Concessions!
 
 
 ## Basic keybinds
@@ -25,10 +23,3 @@ The best performance I have found comes from running under busybox ash
  - ctrl+Q to quit
  - ctrl+O to open a new file
  - ctrl+S to save
-
-## Tested under
-### Linux
- - bash, dash, ash, zsh, ksh93: Runs fast and fine 
- - oksh: works, but unusably slow
- - mksh: works, unusably slow but a bit faster than oksh
- - yash: doesnt have ```printf '%*s'```, so cannot print safely
