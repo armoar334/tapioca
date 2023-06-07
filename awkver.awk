@@ -26,14 +26,14 @@ function setup_term() {
 	system("stty -echo")     # Don't show user input
 	system("stty -ixon")     # Don't have XON/XOFF
 	printf("\033[?1049h")    # Switch buffer
-	printf("\033[22t")       # Xterm title stack
+	#printf("\033[22t")       # Xterm title stack
 	printf("\033[2004h")     # Bracketed paste enable
-	printf("\033]0;tapioca") # Xterm title for vanity
+	#printf("\033]0;tapioca") # Xterm title for vanity
 }
 
 function restore_term(tty_defs) {
 	printf("\033[?1049l") # Back to OG buffer
-	printf("\033[23t")    # Restore title stack
+	#printf("\033[23t")    # Restore title stack
 	system("stty echo")   # Show user input
 	cmd = "stty "$tty_defs
 	cmd
@@ -181,7 +181,7 @@ function editing_mode(filename) {
 	while(running == "true"){
 		printf("\033[?25l")
 		
-		bottom_bar(" "filename" "key" "curl" "curc" "topl" "tlen)
+		bottom_bar(" "filename" "key" "curl" "curc" "topl" "tlen" "ARGC)
 		if ( ptop != topl ) { draw_text() }
 		draw_cursor()
 
@@ -260,7 +260,7 @@ function open_new(filename) {
 		if (status == 0) break
 		text_buffer[++count] = record
 	}
-	close(file)
+	close(filename)
 	return count
 }
 
@@ -268,8 +268,15 @@ function main() {
 	tty_defs = get_stty()
 	setup_term()
 	get_term()
-	landing_page()
-	editing_mode("tapioca")
+	if ( ARGC > 1 ) {
+		if ( system("test -f "ARGV[1]) == 0 )
+			editing_mode(ARGV[1])
+		else
+			landing_page()
+	}
+	else {
+		landing_page()
+	}
 	restore_term(tty_defs)
 }
 
