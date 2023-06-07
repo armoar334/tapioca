@@ -1,459 +1,347 @@
-#!/usr/bin/env sh
+#!/usr/bin/env -S awk --posix -f
 
-trap 'restore_term' EXIT
-
-# Setup functions
-
-get_term() {
-	count=1
-	for word in $(stty size)
-	do
-		case "$count" in
-			1) lines="$word" ;;
-			2) columns="$word" ;;
-		esac
-		count=$((count+1))
-	done
+function get_term() {
+	cmd = "stty size"
+	cmd | getline temp
+	close(cmd)
+	split(temp,temparr," ")
+	lines = temparr[1]
+	columns = temparr[2]
 }
 
-setup_term() {
-	default_settings=$(stty -g)
-
-	print_escape '[?1049h'  # Switch buffer
-	print_escape '[22t'     # Save window name + icon
-
-	print_escape '[?2004h'  # Bracketed paste
-	print_escape '[?7l'     # Disable line wrapping
-	#print_escape '[?25l'    # Hide cursor
-	print_escape ']0;tapioca' # Window title
-	clear
-	stty -icanon # So we can read one at a time
-	stty -ixon # Disable XON/XOFF
-	stty -echo # Dont echo user input
-	stty intr '' # Unbind sigint, normally ctrl-c
+function get_stty() {
+	cmd = "stty -g"
+	cmd | getline temp
+	close(cmd)
+	return temp
 }
 
-restore_term() {
-	print_escape '[?1049l'  # Switch buffer
-	print_escape '[23t'     # Restore window name + icon
-	print_escape '[?25h'    # Show cursor
-	stty "$default_settings"
+function setup_term() {
+	cmd = "uname -a"
+	cmd | getline temp
+	split(temp,temparr," ")
+	os = temparr[1]
+
+	system("stty -icanon")   # Non canonical mode
+	system("stty -echo")     # Don't show user input
+	system("stty -ixon")     # Don't have XON/XOFF
+	printf("\033[?1049h")    # Switch buffer
+	printf("\033[22t")       # Xterm title stack
+	printf("\033[2004h")     # Bracketed paste enable
+	printf("\033]0;tapioca") # Xterm title for vanity
 }
 
-# Interface functions
-
-print_escape() {
-	printf '\033%s' "$1"
+function restore_term(tty_defs) {
+	printf("\033[?1049l") # Back to OG buffer
+	printf("\033[23t")    # Restore title stack
+	system("stty echo")   # Show user input
+	cmd = "stty "$tty_defs
+	cmd
+	close(cmd)
 }
 
-go_to() {
-	if [ -z "$2" ]
-	then
-		temp="[$1H"
+function go_to(line, column) {
+	if (column >= 0)
+		printf("\033[%s;%sH", line, column)
 	else
-		temp="[$1;$2H"
-	fi
-	print_escape "$temp"
+		printf("\033[%sH", line)
 }
 
-getch() {
-	key=''
-	temp=''
+function getch() {
+	key=""
+	temp=""
 
-	esc=$(print_escape)
-	bsp=$(printf '\177')
-	new=$(printf '\n')
-	tab=$(printf '\t')
+	esc = sprintf("\033")
+	bsp = sprintf("\177")
+	new = sprintf("\012")
+	tab = sprintf("\t")
 
-	while [ -z "$key" ]
-	do
-		char=$(dd ibs=1 count=1 2>/dev/null)
-		temp="$temp$char"
-		case "$temp" in
-			"$esc"*) esc_decode "$temp" ;;
-			"$bsp") key='backspace' ;;
-			"$new") key='newline' ;;
-			"$tab") key='tab' ;;
-			' ') key='space' ;;
-			[[:print:]]) key="$char" ;;
-			[[:cntrl:]])
-				key=$(( $(printf '%d' "'$temp") + 64 ))
-				key=$( printf '%03o' "$key")
-				key='ctrl+'$( printf '\'"$key");;
-			*) key='unknown' ;;
-		esac
-	done
+	while( key == "" ) {
+		cmd = "dd ibs=1 count=1 2>/dev/null"
+		cmd | getline char
+		close(cmd)
+		temp = sprintf("%s%s", temp, char)
+		if( temp ~ esc )
+			key = esc_decode(temp)
+		else if( temp ~ bsp )
+			key = "backspace"
+		else if ( temp ~ " " )
+			key = "space"
+		else if ( temp ~ /[[:cntrl:]]/)
+			key = ctrl_decode(temp)
+		else if ( temp ~ /[[:print:]]/)
+			key = temp
+		else if ( temp ~ /\t/ )
+			key = "tab"
+		else if ( temp == "" )
+			key = "newline"
+	}
+
+	return key
 }
 
-esc_decode() {
-	code="$*"
-	dec_temp=''
-	case "$code" in
-		*[A-Z]|*'~') # Only process when code is done
-		case "$code" in
-			*';2'*) dec_temp='shift+' ;;
-			*';3'*) dec_temp='alt+' ;;
-			*';4'*) dec_temp='alt+shift+' ;;
-			*';5'*) dec_temp='ctrl+' ;;
-			*';6'*) dec_temp='ctrl+shift+' ;;
-			*';7'*) dec_temp='ctrl+alt+' ;;
-			*';8'*) dec_temp='ctrl+alt+shift' ;;
-		esac
-		case "$code" in
-			$esc'['*'A')  key="$dec_temp""up" ;;
-			$esc'['*'B')  key="$dec_temp""down" ;;
-			$esc'['*'C')  key="$dec_temp""right" ;;
-			$esc'['*'D')  key="$dec_temp""left" ;;
-			$esc'['*'F')  key="$dec_temp""end" ;;
-			$esc'['*'H')  key="$dec_temp""home" ;;
-			$esc'[2'*'~') key="$dec_temp""insert" ;;
-			$esc'[3'*'~') key="$dec_temp""delete" ;;
-			$esc'[5'*'~') key="$dec_temp""pageup" ;;
-			$esc'[6'*'~') key="$dec_temp""pagedn" ;;
-		esac ;;
-	esac
-
-	if [ -z "$key" ] && [ "${#code}" -gt 6 ]
-	then
-		key='unknown'
-	fi
+function ctrl_decode(temp) {
+	for(n=0;n<256;n++) {
+		ord[sprintf("%c",n)]=n
+		chr[n]=sprintf("%c",n)
+	}
+	temp = ord[temp]
+	temp = temp + 64
+	temp = chr[temp]
+	temp = "ctrl+"temp
+	return temp
 }
 
-landing_page() {
-	logo=$(cat <<-EOF
- ${yel} .. ... . ${end}
- ${yel}##########${end}
- ${end}\________/${end}
- ${end} \______/ ${end}
+function esc_decode(temp) {
+	# Only if its done
+	if ( temp ~ /[A-Z~]$/ ) {
+		#  Modifiers
+		if ( temp ~ /;2/ )
+			key = "shift+"
+		else if ( temp ~ /;3/ )
+			key = "alt+"
+		else if ( temp ~ /;4/ )
+			key = "alt+shift+"
+		else if ( temp ~ /;5/ )
+			key = "ctrl+"
+		else if ( temp ~ /;6/ )
+			key = "ctrl+shift+"
+		else if ( temp ~ /;7/ )
+			key = "ctrl+alt+"
+		else if ( temp ~ /;8/ )
+			key = "ctrl+alt+shift+"
 
-^O Open file
-  ^Q Quit
-	EOF
-	)
+		if ( temp ~ /A$/)
+			key = key"up"
+		else if ( temp ~ /B$/)
+			key = key"down"
+		else if ( temp ~ /C$/)
+			key = key"right"
+		else if ( temp ~ /D$/)
+			key = key"left"
+		else if ( temp ~ /F$/)
+			key = key"end"
+		else if ( temp ~ /H$/)
+			key = key"home"
+		else if ( temp ~ /\[2.*~$/)
+			key = key"insert"
+		else if ( temp ~ /\[3.*~$/) 
+			key = key"delete"
+		else if ( temp ~ /\[5.*~$/)
+			key = key"pageup"
+		else if ( temp ~ /\[6.*~$/)
+			key = key"pagedn"
 
-	# Welcome
-	go_to "$(( ( lines / 2 ) - 4 ))" "$(( ( columns / 2 ) - 9 ))"
-	printf "%s${yel}%s${end}\n" 'welcome to ' 'tapioca'
+		if ( length(temp) > 8 ) {
+			key="unknown"
+		}
 
-	# System + shell
-	cursh=$(ps -p $$)
-	cursh="${cursh##* }"
-	if [ -h "$(which $cursh)" ]
-	then
-		cursh="$(readlink $(which $cursh))"
-	fi
-	cursh="running under $cursh"
-
-	case "$(uname -a)" in
-		Linux*)   cursh="$cursh on linux"  ;;
-		Darwin*)  cursh="$cursh on macOS"  ;;
-		OpenBSD*) cursh="$cursh on openbsd";;
-		FreeBSD*) cursh="$cursh on freebsd";;
-		Serenity) cursh="$cursh on serenityOS" ;;
-		Plan9*)   cursh="$cursh on plan9" ;; # This ones a little optimistic
-		*) cursh="$cursh on unknown" ;;
-	esac
-	go_to "$(( ( lines / 2 ) - 3 ))" "$(( ( columns / 2 ) - ( ${#cursh} / 2 ) ))"
-	count=1
-	for word in $(echo $cursh)
-	do
-		case "$count" in
-			3) printf "${blu}%s${end} " "$word" ;;
-			5) printf "${red}%s${end} " "$word" ;;
-			*) printf "%s " "$word" ;;
-		esac
-		count="$((count+1))"
-	done
-
-	# logo
-	count=1
-	echo "$logo" | while IFS= read -r line
-	do
-		go_to "$(( ( lines / 2 ) - 2 + count ))" "$(( ( columns / 2 ) - 5 ))"
-		echo "$line"
-		count="$((count+1))"
-	done
-	landing=true
-	while [ "$landing" = true ]
-	do
-		bottom_bar " welcome to tapioca!"
-		getch
-		case "$key" in
-			*[Qq]) landing=false ;;
-			'ctrl+'[Oo])
-				landing=false
-				open_ask
-				editing_mode ;;
-		esac
-	done
+		return key
+	}
+	else {
+		return ""
+	}
 }
 
-# Editing
+# Interface
 
-editing_mode() {
-	main_running=true
-	key='' # Just so it doesnt crash first time drawing bar
-	while [ "$main_running" = true ]
-	do
-		printf '%s' "$( bottom_bar " $file_name $key $curl $curc $topl $tlen"
-		draw_text )"
-		getch
-		case "$key" in
-			'ctrl+'[Qq]) main_running=false ;;
-			'ctrl+'[Oo]) open_ask ;;
-			'ctrl+'[Ss]) save_ask ;;
-			'up')   curl=$(( curl - 1 )) ;;
-			'down') curl=$(( curl + 1 )) ;;
-			'left') curc=$(( curc - 1 )) ;;
-			'right')curc=$(( curc + 1 )) ;;
-			'pageup') curl="$(( curl - ( lines - 1 ) ))" ;;
-			'pagedn') curl="$(( curl + ( lines - 1 ) ))" ;;
-			'newline')
-				newline 
-				curc=0
-				curl=$((curl+1))
-				tlen=$((tlen+1)) ;;
-			'backspace')
-				delete
-				curc=$((curc-1)) ;;
-			[[:print:]])
-				insert "$key"
-				curc=$((curc+1)) ;;
-			'space')
-				insert ' '
-				curc=$((curc+1)) ;;
-			*) ;;
-		esac
+function bottom_bar(temp) {
+	go_to(lines)
+	printf("\033[7m%-*s\033[0m", columns, temp)
+}
 
-		# This is maybe not portable but it works well enough so
-		# Curl sanitize
-		case 1 in
-			$(( curl < 1 )) ) curl=1 ;;
-			$(( curl > tlen )) ) curl="$tlen" ;;
-		esac
+function landing_page() {
+	go_to( int( ( lines / 2 ) - 4 ), int( ( columns / 2 ) - 9 ) )
+	printf("welcome to \033[33mtapioca\033[0m")
+	go_to( int( ( lines / 2 ) - 3 ), int( ( columns / 2 ) - 13 ) )
+	printf("running under \033[32mawk\033[0m on \033[31m%s\033[0m", os)
 
-		# Curc sanitize
-		case 1 in
-			$(( curc < 1 )) ) curc=1 ;;
-		esac
+	logo[1] = sprintf("\033[33m")"  .. ... . "
+	logo[2] = sprintf("\033[33m")" ##########"
+	logo[3] = sprintf("\033[0m")" \\________/"
+	logo[4] = sprintf("\033[0m")"  \\______/ "
+	logo[5] = ""
+	logo[6] = sprintf("\033[0m^O Open file\033[0m")
+	logo[7] = sprintf("\033[0m  ^Q Quit\033[0m")
+	go_to( int( ( lines / 2 ) - 1 ) )
+	for(n=1;n<=7;n++) {
+		printf("\033[%sC%s\033[0m\n", int( ( columns / 2 ) - 6 ), logo[n])
+	}	
+	bottom_bar(" welcome to tapioca!")
 
-		# Scroll check
-		case 1 in
-			$(( ( curl - topl ) < 0 )) ) topl="$curl" ;;
-			$(( ( curl - topl ) > ( lines - 2 ) )) ) topl=$(( curl - ( lines - 2 ) )) ;;
-		esac
+	landing = "true"
+	while( landing == "true" ) {
+		key = getch()
+		if ( key == "ctrl+Q" )
+			landing = "false"
+		else if ( key == "ctrl+O" ) {
+			temp = open_ask()
+			if ( temp == 0 ) {
+				landing = "false"
+				editing_mode(opentmp)
+			}
+			else
+				bottom_bar(" Error: file not found")
+		}
+		else if ( key ~ /[Qq]/ )
+			landing = "false"
+		bottom_bar(" welcome to tapioca! "key)
+	}
+}
 
+function editing_mode(filename) {
+	tlen = open_new(filename)
+	curl = 1
+	curc = 0
+	topl = 0
+	ptop = 1 # Previous top to check if full redraw is necesary
+	running = "true"
+	while(running == "true"){
+		printf("\033[?25l")
 		
-		# Scroll sanitize
-		if [ $(( topl + ( lines - 1 ) )) -ge  "$tlen" ]; then topl=$(( tlen - ( lines - 1 ) )); fi
-		if [ "$topl" -lt 1 ]; then topl=1; fi
+		bottom_bar(" "filename" "key" "curl" "curc" "topl" "tlen" "ARGC)
+		if ( ptop != topl ) { draw_text() }
+		draw_cursor()
 
-	done
+		printf("\033[?25h")
+		ptop = topl
+		key = getch()
+		if(key == "ctrl+Q")
+			running=false
+		else if (key == "up")
+			curl -= 1
+		else if (key == "down")
+			curl += 1
+		else if (key == "left")
+			curc -= 1
+		else if (key == "alt+left")
+			curc = 0
+		else if (key == "right")
+			curc += 1
+		else if (key == "alt+right")
+			curc = length(text_buffer[curl])
+		else if (key == "backspace") {
+			line = text_buffer[curl]
+			line = substr(line, 0, curc - 1)""substr(line, curc + 1)
+			text_buffer[curl] = line
+			curc -= 1
+		}
+		else if ( key == "pagedn" )
+			curl += lines - 2
+		else if ( key == "pageup" )
+			curl -= lines - 2
+
+		else if (key == "delete") {
+			line = text_buffer[curl]
+			line = substr(line, 0, curc)""substr(line, curc + 2)
+			text_buffer[curl] = line
+		}
+		else if (key ~ /^[[:print:]]$/) {
+			line = text_buffer[curl]
+			line = substr(line, 0, curc)""key""substr(line, curc + 1)
+			text_buffer[curl] = line
+			curc += 1
+		}
+
+		if ( curc < 0 ) {
+			if ( curl > 1 ) {
+				curl -= 1
+				curc = length(text_buffer[curl])
+			}
+			else
+				curc = 0
+		}
+		if ( curc > length(text_buffer[curl]) ) {
+			if ( curl < tlen ) {
+				curl += 1
+				curc = 0
+			}
+			else
+				curc = length(text_buffer[curl])
+		}
+
+		if ( curl < 1 ) { curl = 1 }
+		if ( curl > tlen) { curl = tlen }
+
+		if ( curl - topl < 1 ) { topl = curl - 1 }
+		if ( curl - topl > lines - 1 ) { topl = curl - ( lines - 1 ) }
+	}
 }
 
-save_ask() {
-	saving=false
-	bottom_bar " Save (y/n)?"
-	getch
-	case "$key" in
-		[Yy]) saving=true ;;
-		*) ;;
-	esac
-	if [ "$saving" = true ]
-	then
-		printf '%s\n' "$text_buffer" > "$file_name"
-	fi
+function draw_text() {
+	go_to(1)
+	for(n=1;n<lines;n++) {
+		printf("\033[7m%*s\033[0m ", length(tlen), n + topl)
+		line = text_buffer[n + topl]
+		if ( length(line) > columns - length(tlen) + 1 ) {
+			line = substr(line, 0, columns - length(tlen) - 2 )""sprintf("\033[7m>\033[0m")
+		}
+		gsub(/\t/, "    ", line)
+		printf("%-*s\n", columns - length(tlen) - 1, line)
+	}
 }
 
-open_ask() {
-	opening=true
-	open_temp=''
-	bottom_bar " Open:"
-	while [ "$opening" = true ]
-	do
-		getch
-		case "$key" in
-			[[:print:]])
-				open_temp="$open_temp$key"
-				bottom_bar " Open: $open_temp" ;;
-			'backspace')
-				open_temp="${open_temp%?}"
-				bottom_bar " Open: $open_temp" ;;
-			'newline') opening=false ;;
-			'tab') bottom_bar " Open: $open_temp | "$(echo "$open_temp"*) ;;
-			*) bottom_bar " Open: $open_temp" ;;
-		esac
-	done
-	open_file "$open_temp"
+function draw_cursor() {
+	go_to(curl - topl)
+	printf("\033[7m%*s\033[0m ", length(tlen), curl)
+	line = text_buffer[curl]
+	line = substr(line, 0, curc)""sprintf("\033""7")""substr(line, curc + 1)
+	gsub(/\t/, "    ", line)
+	printf("%-*s\n", columns - length(tlen) + 1, line)
+	printf("\033""8")
 }
 
-open_file() {
-	open_temp="$1"
-	if [ -f "$open_temp" ]
-	then
-		file_name="$open_temp"
-		text_buffer=$(cat "$open_temp")
-		curl=1
-		curc=1
-		topl=1
-		tlen=$(printf '%s\n' "$text_buffer" | line_count )
+function open_new(filename) {
+	count = 0
+	while (1) {
+		status = getline record < filename
+		if (status == -1) {
+			bottom_bar("Error reading file "filename)
+			exit 1
+		}
+		if (status == 0) break
+		text_buffer[++count] = record
+	}
+	close(filename)
+	return count
+}
+
+function open_ask() {
+	opening = "true"
+	opentmp = ""
+	while ( opening == "true" ) {
+		bottom_bar(" Open: "opentmp)
+		key = getch()
+		if ( key ~ /^[[:print:]]$/ )
+			opentmp = opentmp""key
+		else if ( key == "backspace" )
+			opentmp = substr(opentmp, 0, -1)
+		else if ( key == "newline" )
+			opening = "false"
+	}
+	if ( system("test -f "opentmp) == 0 ) {
+		editing_mode(opentmp)
+	}
 	else
-		bottom_bar "File $open_temp not found or not file"
-	fi
+		return 1
 }
 
-line_count() (
-	count=0
-	while IFS= read -r line
-	do
-		count=$((count+1))
-	done
-	echo "$count"
-)
-
-draw_text() (
-	go_to 1
-	count="$topl"
-	printf '%s' "$text_buffer" | sed -n "$topl"",$(( ( topl + lines ) - 2 ))p" | while [ "$count" -lt $(( topl + ( lines - 1 ) )) ] && IFS= read -r line
-	do
-		print_escape '[2K'
-		printf "${inv}%*s${end} " 3 "$count"
-		if [ "$count" -eq "$curl" ]
-		then
-			temp="$(printf '%*s' $((curc-1)) | tr ' ' '?')"
-			p1="${line#""$temp""}"
-			p1="${line%"$p1"}"
-			
-			p2="${line#""$temp""}"
-
-			printf '%s' "$p1"
-			print_escape '7'
-			printf '%s\n' "$p2"
+function main() {
+	tty_defs = get_stty()
+	setup_term()
+	get_term()
+	if ( ARGC > 1 ) {
+		if ( system("test -f "ARGV[1]) == 0 )
+			editing_mode(ARGV[1])
 		else
-			printf '%s\n' "$line"
-		fi
-		count="$((count+1))"
-	done | sed 's/\t/    /g'
-	if [ "$tlen" -lt $(( lines - 1 )) ]
-	then
-		count="$tlen"
-		until [ "$(( count - topl ))" -eq $(( lines - 1)) ]
-		do
-			print_escape '[K'
-			echo
-			count=$((count+1))
-		done
-	fi
-	print_escape '8'
-)
-
-
-insert() {
-	inschar="$1"
-	text_buffer=$(
-	count=1
-	printf '%s\n' "$text_buffer" | while IFS= read -r line
-	do
-		if [ "$count" -eq "$curl" ];
-		then
-			cunk=1
-			until [ -z "$line" ]
-			do
-				printf '%.1s' "$line"
-				line="${line#?}"
-				if [ "$cunk" -eq "$curc" ]
-				then
-					printf '%s' "$inschar"
-				fi
-				cunk=$(( cunk + 1 ))
-			done
-			echo
-		else
-			printf '%s\n' "$line"
-		fi
-		count=$((count+1))
-	done
-	)	
+			landing_page()
+	}
+	else {
+		landing_page()
+	}
+	restore_term(tty_defs)
 }
 
-delete() {
-	if [ "$curc" -le 1 ]; 
-	then
-		text_buffer=$(
-		count=1
-		printf '%s\n' "$text_buffer" | while IFS= read -r line
-		do
-			if [ "$count" -eq "$((curl-1))" ];
-			then
-				printf '%s' "$line"
-			else
-				printf '%s\n' "$line"
-			fi
-			count=$((count+1))
-		done
-		)
-		tlen=$((tlen-1))
-	else
-		text_buffer=$(
-		count=1
-		printf '%s\n' "$text_buffer" | while IFS= read -r line
-		do
-			if [ "$count" -eq "$curl" ];
-			then
-				printf '%s\n' "$line" | sed 's/.//'$((curc-1))''
-			else
-				printf '%s\n' "$line"
-			fi
-			count=$((count+1))
-		done
-		)
-	fi
+BEGIN {	
+	main()
 }
-
-newline() {
-	text_buffer=$(
-	count=1
-	printf '%s\n' "$text_buffer" | while IFS= read -r line
-	do
-		if [ "$count" -eq "$curl" ];
-		then
-			if [ -z "$line" ];
-			then
-				echo ''
-			else
-				printf '%s\n' "$line" | sed 's/^\(.\{'$((curc-1))'\}\)/\1\n/'
-			fi
-		else
-			printf '%s\n' "$line"
-		fi
-		count=$((count+1))
-	done
-	)	
-}
-
-bottom_bar() {
-	go_to "$lines"
-	printf "$inv%-*s$end" "$columns" "$*"
-}
-
-# Colors
-
-inv=$(print_escape '[7m')
-red=$(print_escape '[31m')
-gre=$(print_escape '[32m')
-yel=$(print_escape '[33m')
-blu=$(print_escape '[34m')
-end=$(print_escape '[0m')
-
-get_term
-setup_term
-
-if [ -f "$*" ]
-then
-	open_file "$*"
-	editing_mode
-else
-	landing_page
-fi
-
-restore_term
