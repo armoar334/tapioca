@@ -174,6 +174,15 @@ function landing_page() {
 		key = getch()
 		if ( key == "ctrl+Q" )
 			landing = "false"
+		else if ( key == "ctrl+O" ) {
+			temp = open_ask()
+			if ( temp == 0 ) {
+				landing = "false"
+				editing_mode(opentmp)
+			}
+			else
+				bottom_bar(" Error: file not found")
+		}
 		else if ( key ~ /[Qq]/ )
 			landing = "false"
 		bottom_bar(" welcome to tapioca! "key)
@@ -234,8 +243,6 @@ function editing_mode(filename) {
 			curc += 1
 		}
 
-
-
 		if ( curc < 0 ) {
 			if ( curl > 1 ) {
 				curl -= 1
@@ -258,8 +265,6 @@ function editing_mode(filename) {
 
 		if ( curl - topl < 1 ) { topl = curl - 1 }
 		if ( curl - topl > lines - 1 ) { topl = curl - ( lines - 1 ) }
-
-		
 	}
 }
 
@@ -307,11 +312,18 @@ function open_ask() {
 	while ( opening == "true" ) {
 		bottom_bar(" Open: "opentmp)
 		key = getch()
-		if ( key ~ /[[:print:]]/ )
+		if ( key ~ /^[[:print:]]$/ )
 			opentmp = opentmp""key
 		else if ( key == "backspace" )
 			opentmp = substr(opentmp, 0, -1)
+		else if ( key == "newline" )
+			opening = "false"
 	}
+	if ( system("test -f "opentmp) == 0 ) {
+		editing_mode(opentmp)
+	}
+	else
+		return 1
 }
 
 function main() {
