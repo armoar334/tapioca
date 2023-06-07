@@ -26,14 +26,14 @@ function setup_term() {
 	system("stty -echo")     # Don't show user input
 	system("stty -ixon")     # Don't have XON/XOFF
 	printf("\033[?1049h")    # Switch buffer
-	#printf("\033[22t")       # Xterm title stack
+	printf("\033[22t")       # Xterm title stack
 	printf("\033[2004h")     # Bracketed paste enable
-	#printf("\033]0;tapioca") # Xterm title for vanity
+	printf("\033]0;tapioca") # Xterm title for vanity
 }
 
 function restore_term(tty_defs) {
 	printf("\033[?1049l") # Back to OG buffer
-	#printf("\033[23t")    # Restore title stack
+	printf("\033[23t")    # Restore title stack
 	system("stty echo")   # Show user input
 	cmd = "stty "$tty_defs
 	cmd
@@ -208,6 +208,11 @@ function editing_mode(filename) {
 			text_buffer[curl] = line
 			curc -= 1
 		}
+		else if ( key == "pagedn" )
+			curl += lines - 2
+		else if ( key == "pageup" )
+			curl -= lines - 2
+
 		else if (key == "delete") {
 			line = text_buffer[curl]
 			line = substr(line, 0, curc)""substr(line, curc + 2)
@@ -226,6 +231,12 @@ function editing_mode(filename) {
 		if ( curc > length(text_buffer[curl]) ) { curc = length(text_buffer[curl]) }
 
 		if ( curl < 1 ) { curl = 1 }
+		if ( curl > tlen) { curl = tlen }
+
+		if ( curl - topl < 1 ) { topl = curl - 1 }
+		if ( curl - topl > lines - 1 ) { topl = curl - ( lines - 1 ) }
+
+		
 	}
 }
 
@@ -242,7 +253,7 @@ function draw_text() {
 function draw_cursor() {
 	go_to(curl - topl)
 	printf("\033[7m%*s\033[0m ", length(tlen), curl)
-	line = text_buffer[curl - topl]
+	line = text_buffer[curl]
 	line = substr(line, 0, curc )""sprintf("\033""7")""substr(line, curc + 1)
 	gsub(/\t/, "    ", line)
 	printf("%-*s\n", columns - length(tlen) - 1, line)
