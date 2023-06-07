@@ -61,7 +61,7 @@ function getch() {
 		cmd | getline char
 		close(cmd)
 		temp = sprintf("%s%s", temp, char)
- 		if( temp ~ esc )
+		if( temp ~ esc )
 			key = esc_decode(temp)
 		else if( temp ~ bsp )
 			key = "backspace"
@@ -132,7 +132,7 @@ function esc_decode(temp) {
 		else if ( temp ~ /\[6.*~$/)
 			key = key"pagedn"
 
-		if ( length(key) > 4 ) {
+		if ( length(temp) > 8 ) {
 			key="unknown"
 		}
 
@@ -168,10 +168,100 @@ function landing_page() {
 		printf("\033[%sC%s\033[0m\n", int( ( columns / 2 ) - 6 ), logo[n])
 	}	
 	bottom_bar(" welcome to tapioca!")
+	getch()
 }
 
-function editing() {
-	print ""
+function editing_mode(filename) {
+	tlen = open_new(filename)
+	curl = 1
+	curc = 0
+	topl = 0
+	ptop = 1 # Previous top to check if full redraw is necesary
+	running = "true"
+	while(running == "true"){
+		printf("\033[?25l")
+		
+		bottom_bar(" "filename" "key" "curl" "curc" "topl" "tlen)
+		if ( ptop != topl ) { draw_text() }
+		draw_cursor()
+
+		printf("\033[?25h")
+		ptop = topl
+		key = getch()
+		if(key == "ctrl+Q")
+			running=false
+		else if (key == "up")
+			curl -= 1
+		else if (key == "down")
+			curl += 1
+		else if (key == "left")
+			curc -= 1
+		else if (key == "alt+left")
+			curc = 0
+		else if (key == "right")
+			curc += 1
+		else if (key == "alt+right")
+			curc = length(text_buffer[curl])
+		else if (key == "backspace") {
+			line = text_buffer[curl]
+			line = substr(line, 0, curc - 1)""substr(line, curc + 1)
+			text_buffer[curl] = line
+			curc -= 1
+		}
+		else if (key == "delete") {
+			line = text_buffer[curl]
+			line = substr(line, 0, curc)""substr(line, curc + 2)
+			text_buffer[curl] = line
+		}
+		else if (key ~ /^[[:print:]]$/) {
+			line = text_buffer[curl]
+			line = substr(line, 0, curc)""key""substr(line, curc + 1)
+			text_buffer[curl] = line
+			curc += 1
+		}
+
+
+
+		if ( curc < 0 ) { curc = 0 }
+		if ( curc > length(text_buffer[curl]) ) { curc = length(text_buffer[curl]) }
+
+		if ( curl < 1 ) { curl = 1 }
+	}
+}
+
+function draw_text() {
+	go_to(1)
+	for(n=1;n<lines;n++) {
+		printf("\033[7m%*s\033[0m ", length(tlen), n + topl)
+		line = text_buffer[n + topl]
+		gsub(/\t/, "    ", line)
+		printf("%-*s\n", columns - length(tlen) - 1, line)
+	}
+}
+
+function draw_cursor() {
+	go_to(curl - topl)
+	printf("\033[7m%*s\033[0m ", length(tlen), curl)
+	line = text_buffer[curl - topl]
+	line = substr(line, 0, curc )""sprintf("\033""7")""substr(line, curc + 1)
+	gsub(/\t/, "    ", line)
+	printf("%-*s\n", columns - length(tlen) - 1, line)
+	printf("\033""8")
+}
+
+function open_new(filename) {
+	count = 0
+	while (1) {
+		status = getline record < filename
+		if (status == -1) {
+			bottom_bar("Error reading file "filename)
+			exit 1
+		}
+		if (status == 0) break
+		text_buffer[++count] = record
+	}
+	close(file)
+	return count
 }
 
 function main() {
@@ -179,14 +269,7 @@ function main() {
 	setup_term()
 	get_term()
 	landing_page()
-	running = "true"
-	while(running == "true"){
-		key = getch()
-		bottom_bar(" "key)
-		if(key == "q"){
-			running=false
-		}
-	}
+	editing_mode("tapioca")
 	restore_term(tty_defs)
 }
 
