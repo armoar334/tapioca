@@ -168,7 +168,16 @@ function landing_page() {
 		printf("\033[%sC%s\033[0m\n", int( ( columns / 2 ) - 6 ), logo[n])
 	}	
 	bottom_bar(" welcome to tapioca!")
-	getch()
+
+	landing = "true"
+	while( landing == "true" ) {
+		key = getch()
+		if ( key == "ctrl+Q" )
+			landing = "false"
+		else if ( key ~ /[Qq]/ )
+			landing = "false"
+		bottom_bar(" welcome to tapioca! "key)
+	}
 }
 
 function editing_mode(filename) {
@@ -290,6 +299,19 @@ function open_new(filename) {
 	}
 	close(filename)
 	return count
+}
+
+function open_ask() {
+	opening = "true"
+	opentmp = ""
+	while ( opening == "true" ) {
+		bottom_bar(" Open: "opentmp)
+		key = getch()
+		if ( key ~ /[[:print:]]/ )
+			opentmp = opentmp""key
+		else if ( key == "backspace" )
+			opentmp = substr(opentmp, 0, -1)
+	}
 }
 
 function main() {
