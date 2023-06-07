@@ -154,7 +154,7 @@ function landing_page() {
 	go_to( int( ( lines / 2 ) - 4 ), int( ( columns / 2 ) - 9 ) )
 	printf("welcome to \033[33mtapioca\033[0m")
 	go_to( int( ( lines / 2 ) - 3 ), int( ( columns / 2 ) - 13 ) )
-	printf("running under \033[32mawk\033[0m on \033[31m%s\033[0m", os)
+	printf("running under \033[32mawk\033[0m on \033[31m%s\033[0m", tolower(os))
 
 	logo[1] = sprintf("\033[33m")"  .. ... . "
 	logo[2] = sprintf("\033[33m")" ##########"
