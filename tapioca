@@ -28,7 +28,7 @@ function setup_term() {
 	printf("\033[?1049h")    # Switch buffer
 	printf("\033[22t")       # Xterm title stack
 	printf("\033[2004h")     # Bracketed paste enable
-	printf("\033]0;tapioca") # Xterm title for vanity
+	printf("\033]0;tapioca\007") # Xterm title for vanity
 }
 
 function restore_term(tty_defs) {
@@ -193,7 +193,7 @@ function landing_page() {
 	}
 }
 
-function editing_mode(filename) {
+function editing_mode(filename, 	running) {
 	tlen = open_new(filename)
 	curl = 1
 	curc = 0
@@ -203,37 +203,28 @@ function editing_mode(filename) {
 	while(running == "true"){
 		printf("\033[?25l")
 		
-		bottom_bar(" "filename" "key" "curl" "curc" "topl" "tlen" "ARGC)
+		bottom_bar(" "filename" "key" "curl" "curc" "topl" "tlen" "running)
 		if ( ptop != topl ) { draw_text() }
 		draw_cursor()
 
 		printf("\033[?25h")
 		ptop = topl
 		key = getch()
-		if(key == "ctrl+Q")
-			running=false
-		else if (key == "up")
-			curl -= 1
-		else if (key == "down")
-			curl += 1
-		else if (key == "left")
-			curc -= 1
-		else if (key == "alt+left")
-			curc = 0
-		else if (key == "right")
-			curc += 1
-		else if (key == "alt+right")
-			curc = length(text_buffer[curl])
+		if(key == "ctrl+Q") { running = "false" }
+		else if (key == "up") { curl -= 1 }
+		else if (key == "down") { curl += 1 }
+		else if (key == "left") { curc -= 1 }
+		else if (key == "alt+left") { curc = 0 }
+		else if (key == "right") { curc += 1 }
+		else if (key == "alt+right") { curc = length(text_buffer[curl]) }
 		else if (key == "backspace") {
 			line = text_buffer[curl]
 			line = substr(line, 0, curc - 1)""substr(line, curc + 1)
 			text_buffer[curl] = line
 			curc -= 1
 		}
-		else if ( key == "pagedn" )
-			curl += lines - 2
-		else if ( key == "pageup" )
-			curl -= lines - 2
+		else if ( key == "pagedn" ) { curl += lines - 2 }
+		else if ( key == "pageup" ) { curl -= lines - 2 }
 		else if (key == "delete") {
 			line = text_buffer[curl]
 			line = substr(line, 0, curc)""substr(line, curc + 2)
