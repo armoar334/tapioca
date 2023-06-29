@@ -23,6 +23,7 @@ function setup_term() {
 	system("stty -icanon")   # Non canonical mode
 	system("stty -echo")     # Don't show user input
 	system("stty -ixon")     # Don't have XON/XOFF
+	system("stty -isig")     # Disable signals
 	printf("\033[?1049h")    # Switch buffer
 	printf("\033[22t")       # Xterm title stack
 	printf("\033[2004h")     # Bracketed paste enable
