@@ -10,8 +10,8 @@ It was built to fill a space that doesn't really exist currently, in that there 
  - The closest thing to a standard "interpreter" is awk
 
 ## Rules
- - Nothing too far out of support from the most basic terminals. I.e no 256 color, no xterm mouse support, nothing that wouldnt work on a real vt100 (or vt200, thats probably more reasonable) WITH THE SINGLE EXCEPTION of brackted paste
- - No implementation specific workaround! no testing for version for any reason other than to show on the landing page. Compatability, not Concessions!
+ - Portability is primary, but ease of use / extensibility is also an important factor. Therefore, functions may be implemented in a way that allows them to be workarounds for limitations or bugs on certain platforms / enviroments, such as 256 / rgb colors and xterm mouse support
+~~ - No implementation specific workaround! no testing for version for any reason other than to show on the landing page. Compatability, not Concessions! ~~
 
 
 ## Basic keybinds
