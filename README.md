@@ -11,7 +11,6 @@ It was built to fill a space that doesn't really exist currently, in that there 
 
 ## Rules
  - Portability is primary, but ease of use / extensibility is also an important factor. Therefore, functions may be implemented in a way that allows them to be workarounds for limitations or bugs on certain platforms / enviroments, such as 256 / rgb colors and xterm mouse support
-~~ - No implementation specific workaround! no testing for version for any reason other than to show on the landing page. Compatability, not Concessions! ~~
 
 
 ## Basic keybinds
