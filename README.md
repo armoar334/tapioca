@@ -22,7 +22,6 @@ It was built to fill a space that doesn't really exist currently, in that there 
  - ctrl+S to save
 
 ## Shells
-bash, ash, dash, ksh93 - working, fast  
+bash, ash, dash, ksh93, zsh - working, fast  
 oksh - works, very slow  
 yash - doesn't work as yash printf hasnt got padding format specifier  
-zsh - doesn't work. fixable, but fix breaks bash, so not going to for now
