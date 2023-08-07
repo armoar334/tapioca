@@ -3,15 +3,13 @@
 
 ## Intro
 Tapioca is built to be as portable as possible out of the box, without sacrificing usability.
-tapioca.sh is the original, posix sh version, although it was too slow and inflexible to be brought up to standard. It is kept here for reference
 
 It was built to fill a space that doesn't really exist currently, in that there are two core concepts it fulfils:
  - The most portable software is interpreted, as it will then run on any architechture or standard implementation
- - The closest thing to a standard "interpreter" is awk
+ - The closest thing to a standard "interpreter" is sh (although technichally that priviledge may be given to awk)  
 
 ## Rules
  - Portability is primary, but ease of use / extensibility is also an important factor. Therefore, functions may be implemented in a way that allows them to be workarounds for limitations or bugs on certain platforms / enviroments, such as 256 / rgb colors and xterm mouse support
-
 
 ## Basic keybinds
  - Arrows to move around
@@ -22,3 +20,9 @@ It was built to fill a space that doesn't really exist currently, in that there 
  - ctrl+Q to quit
  - ctrl+O to open a new file
  - ctrl+S to save
+
+## Shells
+bash, ash, dash, ksh93 - working, fast  
+oksh - works, very slow  
+yash - doesn't work as yash printf hasnt got padding format specifier  
+zsh - doesn't work. fixable, but fix breaks bash, so not going to for now
