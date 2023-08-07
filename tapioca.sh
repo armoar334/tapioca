@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env dash
 
 # Tapioca
 
@@ -240,19 +240,27 @@ then
 	done
 fi
 # Load file into buffer
-text_buff="$(cat "$1")"
+text_buff="$(cat "$1" )"
 file_name="$1"
 oldifs="$IFS"
 IFS='
 '
+# ^ this sucks btw
 set --
 file_leng=0
 # Use positional args as a hacky array
-for line in $text_buff
+#for line in $text_buff
+#do
+#	set -- "$@" "$line"
+#	file_leng=$(( file_leng + 1 ))
+#done
+while IFS= read -r line
 do
 	set -- "$@" "$line"
 	file_leng=$(( file_leng + 1 ))
-done
+done <<EOF
+$text_buff
+EOF
 IFS="$oldifs"
 
 running=true
@@ -274,8 +282,8 @@ do
 		'end') curl="$file_leng" ;;
 		'pageup') curl=$(( curl - ( lines - 1 ) )) ;;
 		'pagedn') curl=$(( curl + ( lines - 1 ) )) ;;
-		*) bottom_bar " key: $key" ;;
 	esac
+	bottom_bar " $file_name $key $curl $curc $toplin $file_leng"
 	# Sanitize
 	if [ "$toplin" -lt 1 ]; then toplin=1; fi
 	if [ "$curc" -lt 1 ]; then curc=1; fi
@@ -294,8 +302,8 @@ do
 	fi
 
 	# Sanitize again
-	if [ "$toplin" -lt 1 ]; then toplin=1; fi
 	if [ "$toplin" -gt $(( file_leng - ( lines - 2 ) )) ]; then toplin=$(( file_leng - ( lines - 2 ) )); fi
+	if [ "$toplin" -lt 1 ]; then toplin=1; fi
 
 done
 restore_term
