@@ -270,6 +270,8 @@ do
 		'down') curl=$(( curl + 1 )) ;;
 		'left') curc=$(( curc - 1 )) ;;
 		'right') curc=$(( curc + 1 )) ;;
+		'home') curl=0 ;;
+		'end') curl="$file_leng" ;;
 		'pageup') curl=$(( curl - ( lines - 1 ) )) ;;
 		'pagedn') curl=$(( curl + ( lines - 1 ) )) ;;
 		*) bottom_bar " key: $key" ;;
@@ -293,6 +295,7 @@ do
 
 	# Sanitize again
 	if [ "$toplin" -lt 1 ]; then toplin=1; fi
+	if [ "$toplin" -gt $(( file_leng - ( lines - 2 ) )) ]; then toplin=$(( file_leng - ( lines - 2 ) )); fi
 
 done
 restore_term
