@@ -11,7 +11,6 @@ sizeof_term() {
 	running=true
 	while [ "$running" = true ]
 	do
-		# This introduces a shit ton of latency, some pure posix witchcraft is a holy grail for speed here
 		char=$(dd ibs=1 count=1 2>/dev/null)
 		temp="$temp""$char"
 		case "$temp" in
@@ -134,6 +133,7 @@ getch() {
 
 	while [ -z "$key" ]
 	do
+		# This introduces a shit ton of latency, some pure posix witchcraft is a holy grail for speed here
 		char=$(dd ibs=1 count=1 2>/dev/null)
 		temp="$temp$char"
 		case "$temp" in
@@ -231,6 +231,12 @@ draw_text() {
 		printf '%s[K%s%*s%s %s\n' "$escape" "${inv}" "${#file_leng}" "$linenum" "${end}" "$t_end"
 		linenum=$(( linenum + 1 ))
 	done
+	# Clear lines if no text on them
+	until [ "$linenum" -gt $(( toplin + ( lines - 2 ) )) ] 
+	do
+		printf '%s[2K\n' "$escape"
+		linenum=$(( linenum + 1 ))
+	done
 	# Character substitution posix style
 	t_end="${curr_text}"
 	printf '%s[H' "$escape"
@@ -259,6 +265,7 @@ mini_prompt() {
 		esac
 	done
 }
+
 # Main
 
 setup_term
@@ -336,6 +343,21 @@ EOF
 					eval "text_buff=\$(printf '%s\n' \"\$@\" | $mini_return )"
 					editing=false
 				fi ;;
+			'ctrl+'[Oo])
+				mini_prompt ' open: '
+				temp_file="$mini_return"
+				if [ -e "$temp_file" ]
+				then
+					file_name="$temp_file"
+					text_buff="$(cat "$temp_file")"
+					temp_file=
+					curc=1
+					curl=1
+					editing=false
+				else
+					bottom_bar ' file '"$temp_file"' does not exist!'
+					read -r _
+				fi ;;
 			'up')
 				if [ "$curl" -gt 1 ]
 				then
@@ -412,26 +434,6 @@ EOF
 				curc=$(( curc + 1 ))
 				curr_text="$l_side"' '"$r_side" ;;
 			'newline')
-				l_side="$curr_text"
-				r_side="$curr_text"
-				while [ "${#l_side}" -ge "$curc" ]
-				do
-					l_side="${l_side%?}" # delete from end
-				done
-				r_side="${r_side#*"$l_side"}"
-				set --
-				while IFS= read -r line
-				do
-					if [ $# = $(( curl - 1 )) ]
-					then
-						set -- "$@" "$(printf '%s\n%s' "$l_side" "$r_side")"
-					else
-						set -- "$@" "$line"
-					fi
-				done <<EOF
-$text_buff
-EOF
-				text_buff="$(printf '%s\n' "$@")"
 				editing=false ;;
 			#'pageup') curl=$(( curl - ( lines - 1 ) )) ;;
 			#'pagedn') curl=$(( curl + ( lines - 1 ) )) ;;
