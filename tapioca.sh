@@ -195,7 +195,14 @@ draw_text() {
 		eval "line=\"\${$linenum}\""
 		printf '%s[K%s%*s%s %s\n' "$escape" "${inv}" "${#file_leng}" "$linenum" "${end}" "$line"
 	done
-	printf '\033[%s;%sH' $(( curl - ( toplin - 1 ) )) $(( curc + ( ${#file_leng} + 1 )))
+	# Character substitution posix style
+	t_end="${curr_text}"
+	printf '%s[H' "$escape"
+	while [ "${#t_end}" -ge "$curc" ]
+	do
+		t_end="${t_end%?}"
+	done
+	printf '\033[%s;%sH%s%s%s' $(( curl - ( toplin - 1 ) )) $(( ${#file_leng} + 2 )) "${red}" "${t_end}" "${end}"
 }
 
 mini_prompt() {
@@ -242,68 +249,90 @@ fi
 # Load file into buffer
 text_buff="$(cat "$1" )"
 file_name="$1"
-oldifs="$IFS"
-IFS='
-'
-# ^ this sucks btw
-set --
-file_leng=0
-# Use positional args as a hacky array
-#for line in $text_buff
-#do
-#	set -- "$@" "$line"
-#	file_leng=$(( file_leng + 1 ))
-#done
-while IFS= read -r line
-do
-	set -- "$@" "$line"
-	file_leng=$(( file_leng + 1 ))
-done <<EOF
-$text_buff
-EOF
-IFS="$oldifs"
-
 running=true
+
 scrl_mrgn=3
 toplin=1
 curl=1
 curc=1
 while [ "$running" = true ]
 do
-	printf '%s' "$(draw_text "$@")"
-	getch
-	case "$key" in
-		'ctrl+'[Qq]) running=false ;;
-		'up') curl=$(( curl - 1 )) ;;
-		'down') curl=$(( curl + 1 )) ;;
-		'left') curc=$(( curc - 1 )) ;;
-		'right') curc=$(( curc + 1 )) ;;
-		'home') curl=0 ;;
-		'end') curl="$file_leng" ;;
-		'pageup') curl=$(( curl - ( lines - 1 ) )) ;;
-		'pagedn') curl=$(( curl + ( lines - 1 ) )) ;;
-	esac
-	bottom_bar " $file_name $key $curl $curc $toplin $file_leng"
-	# Sanitize
-	if [ "$toplin" -lt 1 ]; then toplin=1; fi
-	if [ "$curc" -lt 1 ]; then curc=1; fi
-	if [ "$curl" -lt 1 ]; then curl=1; fi
-	if [ "$curl" -gt "$file_leng" ]; then curl="$file_leng"; fi
-	# Scroll
-	# Up
-	if [ $((curl - toplin )) -lt "$scrl_mrgn" ] && [ "$file_leng" -gt $(( lines - 1 )) ]
-	then
-		toplin=$((curl - scrl_mrgn))
-	fi
-	# Down
-	if [ $((curl - toplin)) -gt $(( lines - scrl_mrgn - 2 )) ] && [ "$file_leng" -gt $(( lines - 2 )) ]
-	then
-		toplin=$(( curl - ( lines - scrl_mrgn - 2 ) ))
-	fi
+	oldifs="$IFS"
+	IFS='
+'
+	# ^ this sucks btw
+	set --
+	file_leng=0
+	# Use positional args as a hacky array
+	#for line in $text_buff
+	#do
+	#	set -- "$@" "$line"
+	#	file_leng=$(( file_leng + 1 ))
+	#done
+	while IFS= read -r line
+	do
+		set -- "$@" "$line"
+		file_leng=$(( file_leng + 1 ))
+	done <<EOF
+$text_buff
+EOF
+	IFS="$oldifs"
+	editing=true
+	# Current line contents
+	curr_text="$1"
+	while [ "$editing" = true ]
+	do
+		printf '%s' "$(draw_text "$@")"
+		getch
+		case "$key" in
+			'ctrl+'[Qq])
+				running=false
+				editing=false ;;
+			'up')
+				if [ "$curl" -gt 1 ]
+				then
+					curl=$(( curl - 1 ))
+					eval "curr_text=\"\${$curl}\""
+				fi ;;
+			'down')
+				if [ "$curl" -lt "$file_leng" ]
+				then
+					curl=$(( curl + 1 ))
+					eval "curr_text=\"\${$curl}\""
+				fi ;;
+			'left')
+				if [ "$curc" -gt 1 ]
+				then
+					curc=$(( curc - 1 ))
+				fi ;;
+			'right')
+				if [ "$curc" -le "${#curr_text}" ]
+				then
+					curc=$(( curc + 1 ))
+				fi ;;
+			'home') curl=1 ;;
+			'end') curl="$file_leng" ;;
+			#'pageup') curl=$(( curl - ( lines - 1 ) )) ;;
+			#'pagedn') curl=$(( curl + ( lines - 1 ) )) ;;
+		esac
+		# Sanitize
+		if [ "$toplin" -lt 1 ]; then toplin=1; fi
+		# Scroll
+		# Up
+		if [ $((curl - toplin )) -lt "$scrl_mrgn" ] && [ "$file_leng" -gt $(( lines - 1 )) ]
+		then
+			toplin=$((curl - scrl_mrgn))
+		fi
+		# Down
+		if [ $((curl - toplin)) -gt $(( lines - scrl_mrgn - 2 )) ] && [ "$file_leng" -gt $(( lines - 2 )) ]
+		then
+			toplin=$(( curl - ( lines - scrl_mrgn - 2 ) ))
+		fi
 
-	# Sanitize again
-	if [ "$toplin" -gt $(( file_leng - ( lines - 2 ) )) ]; then toplin=$(( file_leng - ( lines - 2 ) )); fi
-	if [ "$toplin" -lt 1 ]; then toplin=1; fi
-
+		# Sanitize again
+		if [ "$toplin" -gt $(( file_leng - ( lines - 2 ) )) ]; then toplin=$(( file_leng - ( lines - 2 ) )); fi
+		if [ "$toplin" -lt 1 ]; then toplin=1; fi
+		bottom_bar " $file_name $key $curl $curc $toplin $file_leng"
+	done
 done
 restore_term
