@@ -304,11 +304,25 @@ EOF
 				if [ "$curc" -gt 1 ]
 				then
 					curc=$(( curc - 1 ))
+				else
+					if [ "$curl" -gt 1 ]
+					then
+						curl=$(( curl - 1 ))
+						eval "curr_text=\"\${$curl}\""
+						curc=$(( ${#curr_text} + 1 ))
+					fi
 				fi ;;
 			'right')
 				if [ "$curc" -le "${#curr_text}" ]
 				then
 					curc=$(( curc + 1 ))
+				else
+					if [ "$curl" -lt "$file_leng" ]
+					then
+						curc=1
+						curl=$(( curl + 1 ))
+						eval "curr_text=\"\${$curl}\""
+					fi
 				fi ;;
 			'home') curl=1 ;;
 			'end') curl="$file_leng" ;;
