@@ -11,6 +11,7 @@ sizeof_term() {
 	running=true
 	while [ "$running" = true ]
 	do
+		# This introduces a shit ton of latency, some pure posix witchcraft is a holy grail for speed here
 		char=$(dd ibs=1 count=1 2>/dev/null)
 		temp="$temp""$char"
 		case "$temp" in
@@ -212,7 +213,9 @@ replace_one() {
 draw_text() {
 	printf '%s[H' "$escape"
 	tab=$(printf '\t')
-	for linenum in $(seq "$toplin" $(( toplin + ( lines - 2 ) )) )
+	linenum="$toplin"
+	#for linenum in $(seq "$toplin" $(( toplin + ( lines - 2 ) )) )
+	until [ "$linenum" -gt $(( toplin + ( lines - 2 ) )) ] || [ "$linenum" -gt "$file_leng" ]
 	do
 		if [ "$linenum" = "$curl" ]
 		then
@@ -220,8 +223,13 @@ draw_text() {
 		else
 			eval "line=\"\${$linenum}\""
 		fi
+		until [ "${#line}" -lt $(( columns - ( ${#file_leng} + 2 ) )) ]
+		do
+			line="${line%?}"
+		done
 		replace_all "$line" "$tab" '    '
 		printf '%s[K%s%*s%s %s\n' "$escape" "${inv}" "${#file_leng}" "$linenum" "${end}" "$t_end"
+		linenum=$(( linenum + 1 ))
 	done
 	# Character substitution posix style
 	t_end="${curr_text}"
