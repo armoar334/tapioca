@@ -211,10 +211,16 @@ replace_one() {
 
 draw_text() {
 	printf '%s[H' "$escape"
+	tab=$(printf '\t')
 	for linenum in $(seq "$toplin" $(( toplin + ( lines - 2 ) )) )
 	do
-		eval "line=\"\${$linenum}\""
-		replace_all "$line" "$(printf '\t')" '    '
+		if [ "$linenum" = "$curl" ]
+		then
+			line="$curr_text"
+		else
+			eval "line=\"\${$linenum}\""
+		fi
+		replace_all "$line" "$tab" '    '
 		printf '%s[K%s%*s%s %s\n' "$escape" "${inv}" "${#file_leng}" "$linenum" "${end}" "$t_end"
 	done
 	# Character substitution posix style
@@ -224,7 +230,7 @@ draw_text() {
 	do
 		t_end="${t_end%?}"
 	done
-	replace_all "$t_end" "$(printf '\t')" '    '
+	replace_all "$t_end" "$tab" '    '
 	printf '\033[%s;%sH%s%s%s' $(( curl - ( toplin - 1 ) )) $(( ${#file_leng} + 2 )) "${red}" "${t_end}" "${end}"
 }
 
@@ -287,11 +293,6 @@ do
 	set --
 	file_leng=0
 	# Use positional args as a hacky array
-	#for line in $text_buff
-	#do
-	#	set -- "$@" "$line"
-	#	file_leng=$(( file_leng + 1 ))
-	#done
 	while IFS= read -r line
 	do
 		set -- "$@" "$line"
@@ -302,7 +303,7 @@ EOF
 	IFS="$oldifs"
 	editing=true
 	# Current line contents
-	curr_text="$1"
+	curr_text="$curl"
 	while [ "$editing" = true ]
 	do
 		printf '%s' "$(
@@ -356,6 +357,61 @@ EOF
 			'end')
 				curl="$file_leng"
 				eval "curr_text=\"\${$curl}\"" ;;
+			'backspace')
+				if [ "$curc" -gt 1 ] && [ $(( curc - 1 )) -le "${#curr_text}" ]
+				then
+					curc=$(( curc - 1 ))
+					l_side="$curr_text"
+					r_side="$curr_text"
+					while [ "${#l_side}" -ge "$curc" ]
+					do
+						l_side="${l_side%?}" # delete from end
+					done
+					r_side="${r_side#*"$l_side"?}" # delete from end
+					curr_text="$l_side""$r_side"
+				fi ;;
+			[[:print:]])
+				l_side="$curr_text"
+				r_side="$curr_text"
+				while [ "${#l_side}" -ge "$curc" ]
+				do
+					l_side="${l_side%?}" # delete from end
+				done
+				r_side="${r_side#*"$l_side"}" # delete from end
+				curc=$(( curc + 1 ))
+				curr_text="$l_side""$key""$r_side" ;;
+			'space')
+				l_side="$curr_text"
+				r_side="$curr_text"
+				while [ "${#l_side}" -ge "$curc" ]
+				do
+					l_side="${l_side%?}" # delete from end
+				done
+				r_side="${r_side#*"$l_side"}"
+				curc=$(( curc + 1 ))
+				curr_text="$l_side"' '"$r_side" ;;
+			'newline')
+				l_side="$curr_text"
+				r_side="$curr_text"
+				while [ "${#l_side}" -ge "$curc" ]
+				do
+					l_side="${l_side%?}" # delete from end
+				done
+				r_side="${r_side#*"$l_side"}"
+				set --
+				while IFS= read -r line
+				do
+					if [ $# = $(( curl - 1 )) ]
+					then
+						set -- "$@" "$(printf '%s\n%s' "$l_side" "$r_side")"
+					else
+						set -- "$@" "$line"
+					fi
+				done <<EOF
+$text_buff
+EOF
+				text_buff="$(printf '%s\n' "$@")"
+				editing=false ;;
 			#'pageup') curl=$(( curl - ( lines - 1 ) )) ;;
 			#'pagedn') curl=$(( curl + ( lines - 1 ) )) ;;
 		esac
