@@ -185,21 +185,28 @@ esc_decode() {
 	fi
 }
 
+# pure posix equivalent to ${var//pattern/replace}
 replace_all() {
 	r_side="$1"
 	l_side=
 	t_end=
 	while [ -n "$r_side" ]
 	do
-		l_side="${r_side%%"$2"*}"
+		l_side="${r_side%%$2*}"
 		if  [ "$l_side" = "$r_side" ]
 		then
 			t_end="$t_end""$r_side"
 			return
 		fi
 		t_end="$t_end""$l_side""$3"
-		r_side="${r_side#*"$2"}"
+		r_side="${r_side#*$2}"
 	done
+}
+
+# pure posix equivalent to ${var/pattern/replace}
+replace_one() {
+	l_side="$1"
+	t_end="${l_side%%$2*}""$3""${l_side#*$2}"
 }
 
 draw_text() {
@@ -343,8 +350,12 @@ EOF
 						eval "curr_text=\"\${$curl}\""
 					fi
 				fi ;;
-			'home') curl=1 ;;
-			'end') curl="$file_leng" ;;
+			'home')
+				curl=1
+				eval "curr_text=\"\${$curl}\"" ;;
+			'end')
+				curl="$file_leng"
+				eval "curr_text=\"\${$curl}\"" ;;
 			#'pageup') curl=$(( curl - ( lines - 1 ) )) ;;
 			#'pagedn') curl=$(( curl + ( lines - 1 ) )) ;;
 		esac
