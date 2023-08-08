@@ -277,10 +277,15 @@ then
 			'ctrl+'[Oo])
 				mini_prompt ' open: '
 				temp_file="$mini_return"
-				set --
-				set "$temp_file"
-				temp_file= 
-				landing=false;;
+				if [ -e "$temp_file" ]
+				then
+					set --
+					set "$temp_file"
+					temp_file=
+					landing=false
+				else
+					bottom_bar ' file '"$temp_file"' does not exist!'
+				fi ;;
 		esac
 	done
 fi
