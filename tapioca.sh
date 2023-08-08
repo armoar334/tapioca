@@ -7,14 +7,14 @@ trap 'exit' INT
 trap 'sizeof_term' WINCH
 
 sizeof_term() {
-	printf '%s[9999;9999H%s[6n' "$escape" "$escape" "$escape" "$escape"
+	printf '%s[9999;9999H%s[6n' "$escape" "$escape"
 	running=true
 	while [ "$running" = true ]
 	do
 		char=$(dd ibs=1 count=1 2>/dev/null)
 		temp="$temp""$char"
 		case "$temp" in
-			*"$escape"'['*';'*'R')
+			*'R')
 				IFS='[;R' read -r _ lines columns _ <<EOF
 "$temp"
 EOF
@@ -303,7 +303,7 @@ EOF
 	IFS="$oldifs"
 	editing=true
 	# Current line contents
-	curr_text="$curl"
+	eval "curr_text=\"\${$curl}\""
 	while [ "$editing" = true ]
 	do
 		printf '%s' "$(
