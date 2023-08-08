@@ -37,8 +37,6 @@ setup_term() {
 	blu=$(printf '\033[34m')
 	end=$(printf '\033[0m')
 
-	# Expand possible positional arg length
-	#printf '%s' "${255}"
 	# Save stty settings
 	prior="$(stty -g)"
 	printf '%s[?1049h' "$escape" # Switch buffer
@@ -63,7 +61,6 @@ go_to() {
 	fi
 	printf '\033%s' "$temp"
 }
-
 
 landing_page() {
 	logo=$(cat <<-EOF
@@ -188,12 +185,30 @@ esc_decode() {
 	fi
 }
 
+replace_all() {
+	r_side="$1"
+	l_side=
+	t_end=
+	while [ -n "$r_side" ]
+	do
+		l_side="${r_side%%"$2"*}"
+		if  [ "$l_side" = "$r_side" ]
+		then
+			t_end="$t_end""$r_side"
+			return
+		fi
+		t_end="$t_end""$l_side""$3"
+		r_side="${r_side#*"$2"}"
+	done
+}
+
 draw_text() {
 	printf '%s[H' "$escape"
 	for linenum in $(seq "$toplin" $(( toplin + ( lines - 2 ) )) )
 	do
 		eval "line=\"\${$linenum}\""
-		printf '%s[K%s%*s%s %s\n' "$escape" "${inv}" "${#file_leng}" "$linenum" "${end}" "$line"
+		replace_all "$line" "$(printf '\t')" '    '
+		printf '%s[K%s%*s%s %s\n' "$escape" "${inv}" "${#file_leng}" "$linenum" "${end}" "$t_end"
 	done
 	# Character substitution posix style
 	t_end="${curr_text}"
@@ -202,6 +217,7 @@ draw_text() {
 	do
 		t_end="${t_end%?}"
 	done
+	replace_all "$t_end" "$(printf '\t')" '    '
 	printf '\033[%s;%sH%s%s%s' $(( curl - ( toplin - 1 ) )) $(( ${#file_leng} + 2 )) "${red}" "${t_end}" "${end}"
 }
 
@@ -282,7 +298,10 @@ EOF
 	curr_text="$1"
 	while [ "$editing" = true ]
 	do
-		printf '%s' "$(draw_text "$@")"
+		printf '%s' "$(
+		bottom_bar " $file_name $key $curl $curc $toplin $file_leng"
+		draw_text "$@"
+		)"
 		getch
 		case "$key" in
 			'ctrl+'[Qq])
@@ -346,7 +365,6 @@ EOF
 		# Sanitize again
 		if [ "$toplin" -gt $(( file_leng - ( lines - 2 ) )) ]; then toplin=$(( file_leng - ( lines - 2 ) )); fi
 		if [ "$toplin" -lt 1 ]; then toplin=1; fi
-		bottom_bar " $file_name $key $curl $curc $toplin $file_leng"
 	done
 done
 restore_term
