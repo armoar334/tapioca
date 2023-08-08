@@ -241,7 +241,7 @@ mini_prompt() {
 	mini_return=''
 	while [ "$entering" = true ]
 	do
-		printf '\033[%sH%s%s%s' "$lines" "${inv}" "$prompt" "$mini_return"
+		printf '\033[%sH%s%s%s ' "$lines" "${inv}" "$prompt" "$mini_return"
 		getch
 		case "$key" in
 			[[:print:]]) mini_return="$mini_return""$key" ;;
@@ -318,8 +318,11 @@ EOF
 				editing=false ;;
 			'ctrl+'[Gg])
 				mini_prompt ' run on txt: '
-				eval "text_buff=\$(printf '%s\n' \"\$@\" | $mini_return )"
-				editing=false ;;
+				if [ -n "$mini_return" ]
+				then
+					eval "text_buff=\$(printf '%s\n' \"\$@\" | $mini_return )"
+					editing=false
+				fi ;;
 			'up')
 				if [ "$curl" -gt 1 ]
 				then
