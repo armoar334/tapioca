@@ -241,7 +241,7 @@ mini_prompt() {
 	mini_return=''
 	while [ "$entering" = true ]
 	do
-		printf '\033[%sH%s%s%s ' "$lines" "${inv}" "$prompt" "$mini_return"
+		printf '\033[%sH%s%s%s %s[D' "$lines" "${inv}" "$prompt" "$mini_return" "$escape"
 		getch
 		case "$key" in
 			[[:print:]]) mini_return="$mini_return""$key" ;;
