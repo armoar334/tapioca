@@ -245,6 +245,7 @@ mini_prompt() {
 		getch
 		case "$key" in
 			[[:print:]]) mini_return="$mini_return""$key" ;;
+			'space') mini_return="$mini_return " ;;
 			'backspace') mini_return="${mini_return%?}" ;;
 			'newline') entering=false ;;
 		esac
@@ -314,6 +315,10 @@ EOF
 		case "$key" in
 			'ctrl+'[Qq])
 				running=false
+				editing=false ;;
+			'ctrl+'[Gg])
+				mini_prompt ' run on txt: '
+				eval "text_buff=\$(printf '%s\n' \"\$@\" | $mini_return )"
 				editing=false ;;
 			'up')
 				if [ "$curl" -gt 1 ]
