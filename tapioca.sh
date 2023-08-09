@@ -210,12 +210,21 @@ replace_one() {
 	t_end="${l_side%%$2*}""$3""${l_side#*$2}"
 }
 
+cursor_line_highlight() {	
+	temp_line="$line"
+	while [ "${#temp_line}" -ge "$curc" ]
+	do
+		temp_line="${temp_line%?}"
+	done
+	line="${red}""$temp_line""${end}""$escape"'[s'"${line#"$temp_line"*}"
+}
+
 draw_text() {
 	printf '%s[H' "$escape"
 	tab=$(printf '\t')
 	screen_line="$toplin"
 	text_line="$toplin"
-	until [ "$screen_line" -gt $(( toplin + ( lines - 2 ) )) ] || [ "$text_line" -gt "$file_leng" ]
+	until [ "$screen_line" -ge $(( toplin + ( lines - 1 ) )) ] || [ "$text_line" -gt "$file_leng" ]
 	do
 		if [ "$text_line" = "$curl" ]
 		then
@@ -223,30 +232,61 @@ draw_text() {
 		else
 			eval "line=\"\${$text_line}\""
 		fi
-		until [ "${#line}" -lt $(( columns - ( ${#file_leng} + 2 ) )) ]
-		do
-			line="${line%?}"
-		done
 		replace_all "$line" "$tab" '    '
-		printf '%s[K%s%*s%s %s\n' "$escape" "${inv}" "${#file_leng}" "$text_line" "${end}" "$t_end"
+		line="$t_end"
+		to_proc="$line"
+		procd=''
+		printf '%s[K%s%*s%s ' "$escape" "${inv}" "${#file_leng}" "$text_line" "${end}"
+		# Line wrapping ( baaaaaaaad )
+		if [ "${#line}" -gt $(( columns - ( ${#file_leng} + 1 ))) ]
+		then
+			line=''
+			while [ "${#to_proc}" -gt $(( columns - ( ${#file_leng} + 1 ) )) ] &&
+			[ "$screen_line" -lt $(( toplin + ( lines - 2 ) )) ] 
+			do
+				procd="$to_proc"
+				while [ "${#procd}" -gt $(( columns - ( ${#file_leng} + 1 ) )) ]
+				do
+					procd="${procd% *}"
+				done
+				to_proc="${to_proc#"$procd" }"
+				line="$line""$procd"'
+'
+				# ^ once again, this is dogshit
+				procd=''
+				screen_line=$(( screen_line + 1 ))
+			done
+			line="$line""$to_proc"
+			if [ "$text_line" = "$curl" ]
+			then
+				cursor_line_highlight
+			fi
+			line=$(
+				while IFS= read -r temp_line
+				do
+					printf '%s\n%*s ' "$temp_line" ${#file_leng} ''
+				done <<EOF
+$line
+EOF
+			)
+		else
+		# No line wrapping ( swag )
+			if [ "$text_line" = "$curl" ]
+			then
+				cursor_line_highlight
+			fi
+		fi
+		printf '%s\n' "$line"
 		screen_line=$(( screen_line + 1 ))
 		text_line=$(( text_line + 1 ))
 	done
 	# Clear lines if no text on them
-	until [ "$screen_line" -gt $(( toplin + ( lines - 2 ) )) ] 
+	until [ "$screen_line" -ge $(( toplin + ( lines - 3 ) )) ] 
 	do
 		printf '%s[2K\n' "$escape"
 		screen_line=$(( screen_line + 1 ))
 	done
-	# Character substitution posix style
-	t_end="${curr_text}"
-	printf '%s[H' "$escape"
-	while [ "${#t_end}" -ge "$curc" ]
-	do
-		t_end="${t_end%?}"
-	done
-	replace_all "$t_end" "$tab" '    '
-	printf '\033[%s;%sH%s%s%s' $(( curl - ( toplin - 1 ) )) $(( ${#file_leng} + 2 )) "${red}" "${t_end}" "${end}"
+	printf '\033[u'
 }
 
 mini_prompt() {
@@ -329,7 +369,7 @@ scrl_mrgn=3
 toplin=1
 curl=1
 curc=1
-curr_text
+#curr_text
 while [ "$running" = true ]
 do
 	oldifs="$IFS"
@@ -341,12 +381,12 @@ do
 	# Use positional args as a hacky array
 	while IFS= read -r line
 	do
-		if [ "$#" = $(( curl - 1 )) ]
-		then
-			set -- "$@" "$curr_text"
-		else
-			set -- "$@" "$line"
-		fi
+		#if [ "$#" = $(( curl - 1 )) ]
+		#then
+		#	set -- "$@" "$curr_text"
+		#else
+		set -- "$@" "$line"
+		#fi
 		file_leng=$(( file_leng + 1 ))
 	done <<EOF
 $text_buff
@@ -470,6 +510,8 @@ EOF
 					l_side="${l_side%?}" # delete from end
 				done
 				r_side="${r_side#*"$l_side"}"
+				curr_text="${l_side}"
+				curc="${#curr_text}"
 				while IFS= read -r line
 				do
 					if [ "$#" = $(( curl - 1 )) ]
