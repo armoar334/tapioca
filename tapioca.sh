@@ -219,6 +219,27 @@ cursor_line_highlight() {
 	line="${red}""$temp_line""${end}""$escape"'[s'"${line#"$temp_line"*}"
 }
 
+# Shell equivalent to fold -s -w $2
+word_wrapper() {
+	to_proc="$1"
+	procd=
+	t_end=
+	while [ "${#to_proc}" -gt "$2" ]
+	do
+		procd="$to_proc"
+		while [ "${#procd}" -gt "$2" ]
+		do
+			procd="${procd% *}"
+		done
+		to_proc="${to_proc#"$procd" }"
+		t_end="$t_end""$procd"'
+'
+		# ^ once again, this is dogshit
+		procd=''
+	done
+	t_end="$t_end""$to_proc"
+}
+
 draw_text() {
 	printf '%s[H' "$escape"
 	tab=$(printf '\t')
@@ -234,49 +255,33 @@ draw_text() {
 		fi
 		replace_all "$line" "$tab" '    '
 		line="$t_end"
-		to_proc="$line"
-		procd=''
 		printf '%s[K%s%*s%s ' "$escape" "${inv}" "${#file_leng}" "$text_line" "${end}"
 		# Line wrapping ( baaaaaaaad )
 		if [ "${#line}" -gt $(( columns - ( ${#file_leng} + 1 ))) ]
 		then
-			line=''
-			while [ "${#to_proc}" -gt $(( columns - ( ${#file_leng} + 1 ) )) ] &&
-			[ "$screen_line" -lt $(( toplin + ( lines - 2 ) )) ] 
-			do
-				procd="$to_proc"
-				while [ "${#procd}" -gt $(( columns - ( ${#file_leng} + 1 ) )) ]
-				do
-					procd="${procd% *}"
-				done
-				to_proc="${to_proc#"$procd" }"
-				line="$line""$procd"'
-'
-				# ^ once again, this is dogshit
-				procd=''
-				screen_line=$(( screen_line + 1 ))
-			done
-			line="$line""$to_proc"
+			word_wrapper "$line" $(( columns - ( ${#file_leng} + 1 )))
+			line="$t_end"
 			if [ "$text_line" = "$curl" ]
 			then
 				cursor_line_highlight
 			fi
-			line=$(
-				while IFS= read -r temp_line
-				do
-					printf '%s\n%*s ' "$temp_line" ${#file_leng} ''
-				done <<EOF
+			
+			while IFS= read -r temp_line
+			do
+				screen_line=$(( screen_line + 1 ))
+				printf '%s\n%*s ' "$temp_line" ${#file_leng} ''
+			done <<EOF
 $line
 EOF
-			)
+		printf '\033[%sD' $(( ${#file_leng} + 1 ))
 		else
 		# No line wrapping ( swag )
 			if [ "$text_line" = "$curl" ]
 			then
 				cursor_line_highlight
 			fi
+			printf '%s\n' "$line"
 		fi
-		printf '%s\n' "$line"
 		screen_line=$(( screen_line + 1 ))
 		text_line=$(( text_line + 1 ))
 	done
@@ -293,15 +298,15 @@ mini_prompt() {
 	prompt="$1"
 	bottom_bar ''
 	entering=true
-	mini_return=''
+	t_end=''
 	while [ "$entering" = true ]
 	do
-		printf '\033[%sH%s%s%s %s[D' "$lines" "${inv}" "$prompt" "$mini_return" "$escape"
+		printf '\033[%sH%s%s%s %s[D' "$lines" "${inv}" "$prompt" "$t_end" "$escape"
 		getch
 		case "$key" in
-			[[:print:]]) mini_return="$mini_return""$key" ;;
-			'space') mini_return="$mini_return " ;;
-			'backspace') mini_return="${mini_return%?}" ;;
+			[[:print:]]) t_end="$t_end""$key" ;;
+			'space') t_end="$t_end " ;;
+			'backspace') t_end="${t_end%?}" ;;
 			'newline') entering=false ;;
 		esac
 	done
@@ -347,7 +352,7 @@ then
 			'ctrl+'[Qq]) exit ;;
 			'ctrl+'[Oo])
 				mini_prompt ' open: '
-				temp_file="$mini_return"
+				temp_file="$t_end"
 				if [ -e "$temp_file" ]
 				then
 					set --
@@ -409,14 +414,14 @@ EOF
 				editing=false ;;
 			'ctrl+'[Gg])
 				mini_prompt ' run on txt: '
-				if [ -n "$mini_return" ]
+				if [ -n "$t_end" ]
 				then
-					eval "text_buff=\$(printf '%s\n' \"\$@\" | $mini_return )"
+					eval "text_buff=\$(printf '%s\n' \"\$@\" | $t_end )"
 					editing=false
 				fi ;;
 			'ctrl+'[Oo])
 				mini_prompt ' open: '
-				temp_file="$mini_return"
+				temp_file="$t_end"
 				if [ -e "$temp_file" ]
 				then
 					file_name="$temp_file"
@@ -477,8 +482,7 @@ EOF
 					done
 					r_side="${r_side#*"$l_side"?}" # delete from end
 					curr_text="$l_side""$r_side"
-				fi
-				editing=false ;;
+				fi ;;
 			[[:print:]])
 				l_side="$curr_text"
 				r_side="$curr_text"
