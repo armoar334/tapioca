@@ -269,7 +269,7 @@ draw_text() {
 			while IFS= read -r temp_line
 			do
 				screen_line=$(( screen_line + 1 ))
-				printf '%s\n%*s ' "$temp_line" ${#file_leng} ''
+				printf '%s\n%s%*s%s ' "$temp_line" "${inv}" ${#file_leng} '' "${end}"
 			done <<EOF
 $line
 EOF
