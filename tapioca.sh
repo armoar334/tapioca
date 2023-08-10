@@ -216,7 +216,8 @@ cursor_line_highlight() {
 	do
 		temp_line="${temp_line%?}"
 	done
-	line="${red}""$temp_line""${end}""$escape"'[s'"${line#"$temp_line"*}"
+	#line="${gre}""$temp_line""${end}""$escape"'[s'"${line#"$temp_line"*}"
+	line="$temp_line""$escape"'[s'"${line#"$temp_line"*}"
 }
 
 # Shell equivalent to fold -s -w $2
@@ -437,16 +438,27 @@ EOF
 			'up')
 				if [ "$curl" -gt 1 ]
 				then
-					curl=$(( curl - 1 ))
-					eval "curr_text=\"\${$curl}\""
+					if [ $(( curc - ( columns - ( ${#file_leng} + 1 ) ) )) -ge 1 ]
+					then
+						curc=$(( curc - ( columns - ( ${#file_leng} + 1 ) ) ))
+					else
+						curl=$(( curl - 1 ))
+						eval "curr_text=\"\${$curl}\""
+					fi
 				fi ;;
 			'down')
 				if [ "$curl" -lt "$file_leng" ]
 				then
-					curl=$(( curl + 1 ))
-					eval "curr_text=\"\${$curl}\""
+					if [ $(( curc + ( columns - ( ${#file_leng} + 1 ) ) )) -le "${#curr_text}" ]
+					then
+						curc=$(( curc + ( columns - ( ${#file_leng} + 1 ) ) ))
+					else
+						curl=$(( curl + 1 ))
+						eval "curr_text=\"\${$curl}\""
+					fi
 				fi ;;
 			'left')
+				curc_bound
 				curc=$(( curc - 1 ))
 				if [ "$curl" -gt 1 ] && [ "$curc" -lt 1 ]
 				then
@@ -456,6 +468,7 @@ EOF
 				fi
 				curc_bound ;;
 			'right')
+				curc_bound
 				curc=$(( curc + 1 ))
 				if [ "$curl" -lt "$file_leng" ] && [ $(( curc - 1 )) -gt "${#curr_text}" ]
 				then
