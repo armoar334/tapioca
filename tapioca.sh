@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env dash
 
 # Tapioca
 
@@ -11,7 +11,7 @@ sizeof_term() {
 	running=true
 	while [ "$running" = true ]
 	do
-		read -rsN1 char
+		char=$(dd ibs=1 count=1 2>/dev/null)
 		temp="$temp""$char"
 		case "$temp" in
 			*'R')
@@ -134,7 +134,7 @@ getch() {
 	while [ -z "$key" ]
 	do
 		# This introduces a shit ton of latency, some pure posix witchcraft is a holy grail for speed here
-		read -rsN1 char
+		char=$(dd ibs=1 count=1 2>/dev/null)
 		temp="$temp$char"
 		case "$temp" in
 			"$esc"*) esc_decode "$temp" ;;
