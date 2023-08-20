@@ -41,9 +41,7 @@ setup_term() {
 	prior="$(stty -g)"
 	printf '%s[?1049h' "$escape" # Switch buffer
 	#printf '%s[?25l' "$escape" # Hide cursor
-	stty -icanon
-	stty -ixon
-	stty -echo
+	stty -icanon -ixon -echo time 1
 }
 
 restore_term() {
@@ -134,7 +132,7 @@ getch() {
 	while [ -z "$key" ]
 	do
 		# This introduces a shit ton of latency, some pure posix witchcraft is a holy grail for speed here
-		char=$(dd ibs=1 count=1 2>/dev/null)
+		char=$(dd ibs=6 count=1 2>/dev/null)
 		temp="$temp$char"
 		case "$temp" in
 			"$esc"*) esc_decode "$temp" ;;
