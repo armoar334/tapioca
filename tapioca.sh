@@ -250,7 +250,7 @@ draw_text() {
 		then
 			line="$curr_text"
 		else
-			eval "line=\"\${$text_line}\""
+			eval "line=\"\${file_line$text_line}\""
 		fi
 		replace_all "$line" "$tab" '    '
 		line="$t_end"
@@ -381,7 +381,7 @@ do
 '
 	# ^ this sucks btw
 	set --
-	file_leng=0
+	file_leng=1
 	# Use positional args as a hacky array
 	while IFS= read -r line
 	do
@@ -389,8 +389,9 @@ do
 		#then
 		#	set -- "$@" "$curr_text"
 		#else
-		set -- "$@" "$line"
+		#set -- "$@" "$line"
 		#fi
+		eval "file_line""$file_leng""="'$line'
 		file_leng=$(( file_leng + 1 ))
 	done <<EOF
 $text_buff
@@ -399,12 +400,12 @@ EOF
 	text_buff=$(printf '%s\n' "$@")
 	editing=true
 	# Current line contents
-	eval "curr_text=\"\${$curl}\""
+	eval "curr_text=\"\${file_line$curl}\""
 	while [ "$editing" = true ]
 	do
 		printf '%s' "$(
 		bottom_bar " $file_name $key $curl $curc $toplin $file_leng"
-		draw_text "$@"
+		draw_text
 		)"
 		getch
 		case "$key" in
@@ -441,7 +442,7 @@ EOF
 						curc=$(( curc - ( columns - ( ${#file_leng} + 1 ) ) ))
 					else
 						curl=$(( curl - 1 ))
-						eval "curr_text=\"\${$curl}\""
+						eval "curr_text=\"\${file_line$curl}\""
 					fi
 				fi ;;
 			'down')
@@ -452,7 +453,7 @@ EOF
 						curc=$(( curc + ( columns - ( ${#file_leng} + 1 ) ) ))
 					else
 						curl=$(( curl + 1 ))
-						eval "curr_text=\"\${$curl}\""
+						eval "curr_text=\"\${file_line$curl}\""
 					fi
 				fi ;;
 			'left')
@@ -462,7 +463,7 @@ EOF
 				then
 					curc=99999999 # Bad, fix later
 					curl=$(( curl - 1 ))
-					eval "curr_text=\"\${$curl}\""
+					eval "curr_text=\"\${file_line$curl}\""
 				fi
 				curc_bound ;;
 			'right')
@@ -472,15 +473,15 @@ EOF
 				then
 					curc=1
 					curl=$(( curl + 1 ))
-					eval "curr_text=\"\${$curl}\""
+					eval "curr_text=\"\${file_line$curl}\""
 				fi
 				curc_bound ;;
 			'home')
 				curl=1
-				eval "curr_text=\"\${$curl}\"" ;;
+				eval "curr_text=\"\${file_line$curl}\"" ;;
 			'end')
 				curl="$file_leng"
-				eval "curr_text=\"\${$curl}\"" ;;
+				eval "curr_text=\"\${file_line$curl}\"" ;;
 			'backspace')
 				if [ "$curc" -gt 1 ] && [ $(( curc - 1 )) -le "${#curr_text}" ]
 				then
