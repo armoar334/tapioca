@@ -62,6 +62,7 @@ getch() {
 		char=$(dd ibs=6 count=1 2>/dev/null)
 		temp="$temp$char"
 		case "$temp" in
+			"$esc") key='escape' ;;
 			"$esc"*) esc_decode "$temp" ;;
 			"$bsp") key='backspace' ;;
 			"$new") key='newline' ;;
@@ -89,7 +90,7 @@ esc_decode() {
 			*';5'*) dec_temp='ctrl+' ;;
 			*';6'*) dec_temp='ctrl+shift+' ;;
 			*';7'*) dec_temp='ctrl+alt+' ;;
-			*';8'*) dec_temp='ctrl+alt+shift' ;;
+			*';8'*) dec_temp='ctrl+alt+shift+' ;;
 		esac
 		case "$code" in
 			$esc'['*'A')  key="$dec_temp""up" ;;
@@ -115,16 +116,16 @@ esc_decode() {
 replace_all() {
 	r_side="$1"
 	l_side=
-	t_end=
+	l_end=
 	while [ -n "$r_side" ]
 	do
 		l_side="${r_side%%$2*}"
 		if  [ "$l_side" = "$r_side" ]
 		then
-			t_end="$t_end""$r_side"
+			l_end="$l_end""$r_side"
 			return
 		fi
-		t_end="$t_end""$l_side""$3"
+		l_end="$l_end""$l_side""$3"
 		r_side="${r_side#*$2}"
 	done
 }
@@ -162,7 +163,7 @@ draw_text() {
 	do
 		eval 'l_temp="$f_line'"$l_ruler"'"'
 		replace_all "$l_temp" "$tab" '    '
-		l_proc="$t_end"
+		l_proc="$l_end"
 		l_done=
 		while [ "${#l_proc}" -gt 80 ] && [ "$l_screen" -lt "$lines" ]
 		do
@@ -204,17 +205,43 @@ fi
 setup_term
 sizeof_term
 
-l_top=1 # Top line to draw
+l_top=1  # Top line to draw
+p_top=-1 # Previos top ( to check scroll )
+s_mrg=3  # Scroll margin
 
+c_col=1 # Cursor column
+c_lin=1 # Cursor lin
 
 while [ "$key" != 'ctrl+Q' ]
 do
-	printf '%s%s\n%s' "$(draw_rule)" "$(draw_text)" "$key"
+	[ "$l_top" != "$p_top" ] && printf '%s' "$(draw_rule)"
+	printf '%s\n%s' "$(draw_text)" "$key"
+	printf '\033[%sH' $(( c_lin - l_top ))
 	getch
 	case "$key" in
-		'up') l_top=$(( l_top - 1 )) ;;
-		'down') l_top=$(( l_top + 1 )) ;;
+		'up')     c_lin=$(( c_lin - 1 )) ;;
+		'down')   c_lin=$(( c_lin + 1 )) ;;
+		'pageup') c_lin=$(( c_lin - lines )) ;;
+		'pagedn') c_lin=$(( c_lin + lines )) ;;
+
 	esac
+
+	[ "$c_lin" -lt 1 ] && c_lin=1
+	[ "$c_lin" -ge "$f_leng" ] && c_lin=$(( f_leng - 1 ))
+
+	# Scroll up
+	if [ $(( c_lin - l_top )) -lt "$s_mrg" ] && [ "$f_leng" -gt $(( lines - 1 )) ]
+	then
+		p_top="$l_top"
+		l_top=$((c_lin - s_mrg))
+	fi
+	# Down
+	if [ $(( c_lin - l_top)) -gt $(( lines - s_mrg - 2 )) ] && [ "$f_leng" -gt $(( lines - 2 )) ]
+	then
+		p_top="$l_top"
+		l_top=$(( c_lin - ( lines - s_mrg - 2 ) ))
+	fi
+
 	[ "$l_top" -lt 1 ] && l_top=1
 	[ "$l_top" -ge "$f_leng" ] && l_top=$(( f_leng - 1 ))
 done
