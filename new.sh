@@ -229,12 +229,13 @@ c_lin=1 # Cursor lin
 
 while [ "$key" != 'ctrl+Q' ]
 do
+	screen_buffer=''
 	if [ "$l_top" != "$p_top" ]
 	then
-		printf '%s%s\n%s' "$(draw_rule)" "$(draw_text)" "$key L: $c_lin C: $c_col"
-	else
-		printf '%s\n%s           ' "$(draw_text)" "$key L: $c_lin C: $c_col"
+		screen_buffer="$(draw_rule)"
 	fi
+	screen_buffer="$screen_buffer""$(draw_text)"
+	printf '%s\033[999B\r%s' "$screen_buffer" "$key L: $c_lin C: $c_col"
 	printf '\033''8'
 	getch
 	case "$key" in
@@ -250,7 +251,31 @@ do
 	[ "$c_lin" -lt 1 ] && c_lin=1
 	[ "$c_lin" -ge "$f_leng" ] && c_lin=$(( f_leng - 1 ))
 
-	[ "$c_col" -lt 0 ] && c_col=0
+	# Cursor wrapping left
+	if [ "$c_col" -lt 0 ]
+	then
+		if [ "$c_lin" -gt 1 ]
+		then
+			c_lin=$(( c_lin - 1 ))
+			eval 'l_temp=${f_line'"$c_lin"'}'
+			c_col=${#l_temp}
+		else
+			c_col=0
+		fi
+	fi
+
+	# Cursor wrapping right
+	eval 'l_temp=${f_line'"$c_lin"'}'
+	if [ "$c_col" -gt ${#l_temp} ]
+	then
+		if [ "$c_lin" -lt $(( f_leng - 1 )) ]
+		then
+			c_lin=$(( c_lin + 1 ))
+			c_col=0
+		else
+			c_col=${#l_temp}
+		fi
+	fi
 
 	# Scroll up
 	if [ $(( c_lin - l_top )) -lt "$s_mrg" ] && [ "$f_leng" -gt $(( lines - 1 )) ]
