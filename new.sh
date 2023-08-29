@@ -37,6 +37,8 @@ setup_term() {
 	bsp=$(printf '\177')
 	new=$(printf '\n')
 	tab=$(printf '\t')
+	sav=$(printf '\033''7') # Save cursor pos
+	res=$(printf '\033''8') # Restore cursor pos
 	
 	# Save stty settings
 	prior="$(stty -g)"
@@ -144,7 +146,8 @@ draw_rule() {
 		elif [ "$l_ruler" -lt "$f_leng" ]
 		then
 			printf '%s%*s%s \n' "${inv}" "${#f_leng}" "$l_ruler" "${end}"
-			eval 'l_temp=$(( ${#f_line'"$l_ruler"'} / 80 ))'
+			eval 'replace_all "$f_line'$l_ruler'" "$tab" "    "'
+			l_temp=$(( ${#l_end} / 80 ))
 			l_blanks="$l_temp"
 			l_ruler=$(( l_ruler + 1 ))
 		else
@@ -154,6 +157,7 @@ draw_rule() {
 	done
 }
 
+# Todo: this is mild feces
 draw_text() {
 	printf '\033[H'
 	l_ruler="$l_top"
@@ -161,8 +165,18 @@ draw_text() {
 	l_blanks=0
 	while [ "$l_screen" -lt "$lines" ] && [ "$l_ruler" -lt "$f_leng" ]
 	do
-		eval 'l_temp="$f_line'"$l_ruler"'"'
-		replace_all "$l_temp" "$tab" '    '
+		eval 'l_done="$f_line'"$l_ruler"'"'
+		# This messes with wrapping, shoul fix l8r
+		if [ "$l_ruler" = "$c_lin" ]
+		then
+			l_temp="$l_done"
+			while [ "${#l_temp}" -gt "$c_col" ]
+			do
+				l_temp="${l_temp%?}"
+			done
+			l_done="$l_temp""$sav""${l_done#"$l_temp"}"
+		fi
+		replace_all "$l_done" "$tab" '    '
 		l_proc="$l_end"
 		l_done=
 		while [ "${#l_proc}" -gt 80 ] && [ "$l_screen" -lt "$lines" ]
@@ -176,8 +190,9 @@ draw_text() {
 			printf '\033[%sC %s\033[K\n' "${#f_leng}" "$l_done"
 			l_done=''
 			l_screen=$(( l_screen + 1 ))
+			l_subl=$(( l_subl + 1 ))
 		done
-		[ "$l_screen" -lt "$lines" ] && printf '\033[%sC %s\033[K\n' "${#f_leng}" "$l_proc"
+		printf '\033[%sC %s\033[K\n' "${#f_leng}" "$l_proc"
 		l_ruler=$(( l_ruler + 1 ))
 		l_screen=$(( l_screen + 1 ))
 	done
@@ -209,18 +224,24 @@ l_top=1  # Top line to draw
 p_top=-1 # Previos top ( to check scroll )
 s_mrg=3  # Scroll margin
 
-c_col=1 # Cursor column
+c_col=0 # Cursor column
 c_lin=1 # Cursor lin
 
 while [ "$key" != 'ctrl+Q' ]
 do
-	[ "$l_top" != "$p_top" ] && printf '%s' "$(draw_rule)"
-	printf '%s\n%s' "$(draw_text)" "$key"
-	printf '\033[%sH' $(( c_lin - l_top ))
+	if [ "$l_top" != "$p_top" ]
+	then
+		printf '%s%s\n%s' "$(draw_rule)" "$(draw_text)" "$key L: $c_lin C: $c_col"
+	else
+		printf '%s\n%s           ' "$(draw_text)" "$key L: $c_lin C: $c_col"
+	fi
+	printf '\033''8'
 	getch
 	case "$key" in
 		'up')     c_lin=$(( c_lin - 1 )) ;;
 		'down')   c_lin=$(( c_lin + 1 )) ;;
+		'left')   c_col=$(( c_col - 1 )) ;;
+		'right')  c_col=$(( c_col + 1 )) ;;
 		'pageup') c_lin=$(( c_lin - lines )) ;;
 		'pagedn') c_lin=$(( c_lin + lines )) ;;
 
@@ -228,6 +249,8 @@ do
 
 	[ "$c_lin" -lt 1 ] && c_lin=1
 	[ "$c_lin" -ge "$f_leng" ] && c_lin=$(( f_leng - 1 ))
+
+	[ "$c_col" -lt 0 ] && c_col=0
 
 	# Scroll up
 	if [ $(( c_lin - l_top )) -lt "$s_mrg" ] && [ "$f_leng" -gt $(( lines - 1 )) ]
