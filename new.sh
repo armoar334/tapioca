@@ -147,11 +147,11 @@ draw_rule() {
 		then
 			printf '%s%*s%s \n' "${inv}" "${#f_leng}" "$l_ruler" "${end}"
 			eval 'replace_all "$f_line'$l_ruler'" "$tab" "    "'
-			l_temp=$(( ${#l_end} / 80 ))
+			l_temp=$(( ${#l_end} / columns ))
 			l_blanks="$l_temp"
 			l_ruler=$(( l_ruler + 1 ))
-		else
-			printf '\033[2K\n'
+		#else
+			#printf '\033[2K\n'
 		fi
 		l_screen=$(( l_screen + 1 ))
 	done
@@ -179,10 +179,10 @@ draw_text() {
 		replace_all "$l_done" "$tab" '    '
 		l_proc="$l_end"
 		l_done=
-		while [ "${#l_proc}" -gt 80 ] && [ "$l_screen" -lt "$lines" ]
+		while [ "${#l_proc}" -gt "$columns" ] && [ "$l_screen" -lt "$lines" ]
 		do
 			l_done="$l_proc"
-			while [ "${#l_done}" -gt 80 ]
+			while [ "${#l_done}" -gt "$columns" ]
 			do
 				l_done="${l_done%?}"
 			done
@@ -198,56 +198,53 @@ draw_text() {
 	done
 }
 
-# Main
+draw_logo() {
+	logo=$(cat <<-EOF
+ ${red} .. ... . ${end}
+ ${yel}##########${end}
+ ${end}\________/${end}
+ ${end} \______/ ${end}
 
-if [ -n "$1" ]
-then
-	file_raw="$(cat "$1")"
-	f_leng=1
-	while IFS= read -r line
-	do
-		eval "f_line""$f_leng""="'$line'
-		f_leng=$(( f_leng + 1 ))
-	done <<EOF
-$file_raw
-EOF
+^O Open file
+  ^Q Quit
+	EOF
+	)
 
-else
-	echo "No file dickhead"
-	exit
-fi
+	# Welcome
+	printf '\033[%s;%sH' "$(( ( lines / 2 ) - 4 ))" "$(( ( columns / 2 ) - 9 ))"
+	printf "%s${yel}%s${end}\n" 'welcome to ' 'tapioca'
 
-setup_term
-sizeof_term
-
-l_top=1  # Top line to draw
-p_top=-1 # Previos top ( to check scroll )
-s_mrg=3  # Scroll margin
-
-c_col=0 # Cursor column
-c_lin=1 # Cursor lin
-
-while [ "$key" != 'ctrl+Q' ]
-do
-	screen_buffer=''
-	if [ "$l_top" != "$p_top" ]
+	# System + shell
+	cursh=$(ps -p $$)
+	cursh="${cursh##* }"
+	if [ -h "$(which "$cursh")" ]
 	then
-		screen_buffer="$(draw_rule)"
+		cursh="$(readlink "$(which "$cursh")")"
 	fi
-	screen_buffer="$screen_buffer""$(draw_text)"
-	printf '%s\033[999B\r%s' "$screen_buffer" "$key L: $c_lin C: $c_col"
-	printf '\033''8'
-	getch
-	case "$key" in
-		'up')     c_lin=$(( c_lin - 1 )) ;;
-		'down')   c_lin=$(( c_lin + 1 )) ;;
-		'left')   c_col=$(( c_col - 1 )) ;;
-		'right')  c_col=$(( c_col + 1 )) ;;
-		'pageup') c_lin=$(( c_lin - lines )) ;;
-		'pagedn') c_lin=$(( c_lin + lines )) ;;
 
+	case "$(uname -a)" in
+		Linux*)   curos="linux"  ;;
+		Darwin*)  curos="macOS"  ;;
+		OpenBSD*) curos="openbsd";;
+		FreeBSD*) curos="freebsd";;
+		Serenity) curos="serenityOS" ;;
+		Plan9*)   curos="plan9" ;; # This ones a little optimistic
+		*) cursh="unknown" ;;
 	esac
+	l_temp="running under $cursh on $curos"
+	printf '\033[%s;%sH' "$(( ( lines / 2 ) - 3 ))" "$(( ( columns / 2 ) - ( ${#l_temp} / 2 ) ))"
+	printf 'running under %s on %s' "${blu}$cursh${end}" "${red}$curos${end}"
 
+	# logo
+	printf '\033[%sH' $(( ( lines / 2 ) - 2 ))
+	echo "$logo" | while IFS= read -r line
+	do
+		printf '\033[%sC%s\n' "$(( ( columns / 2 ) - 6 ))" "$line"
+	done
+
+}
+
+cursor_stuff() {
 	[ "$c_lin" -lt 1 ] && c_lin=1
 	[ "$c_lin" -ge "$f_leng" ] && c_lin=$(( f_leng - 1 ))
 
@@ -276,7 +273,9 @@ do
 			c_col=${#l_temp}
 		fi
 	fi
+}
 
+scroll_check() {
 	# Scroll up
 	if [ $(( c_lin - l_top )) -lt "$s_mrg" ] && [ "$f_leng" -gt $(( lines - 1 )) ]
 	then
@@ -292,5 +291,96 @@ do
 
 	[ "$l_top" -lt 1 ] && l_top=1
 	[ "$l_top" -ge "$f_leng" ] && l_top=$(( f_leng - 1 ))
+}
+
+open_file() {
+	file_raw="$(cat "$1")"
+	f_leng=1
+	while IFS= read -r line
+	do
+		eval "f_line""$f_leng""="'$line'
+		f_leng=$(( f_leng + 1 ))
+	done <<EOF
+$file_raw
+EOF
+}
+
+prompt() {
+	printf '\033[%sH' "$lines"
+	l_temp=
+	p_col=0
+	p_lin=''
+	while [ "$key" != "newline" ]
+	do
+		printf '\r%s%-*s\r%s%s' "${inv}" "$columns" '' "$1" "$p_lin" "${end}"
+		getch
+		case "$key" in
+			'left'  )
+				[ "$p_col" -gt 1 ] && p_col=$(( p_col - 1 )) ;;
+			'right')
+				[ "$p_col" -lt ${#p_lin} ] && p_col=$(( p_col + 1 )) ;;
+			'backspace')
+				p_lin="${p_lin%?}" ;;
+			[[:print:]])
+				p_lin="$p_lin""$key" ;;
+			esac
+	done
+	l_temp="$"
+}
+
+# Main
+
+
+setup_term
+sizeof_term
+
+if [ "$#" -gt 0 ]
+then
+	for item in "$@"
+	do
+		[ -e "$item" ] && open_file "$item"
+	done
+else
+	#echo "No file DICKHEAD"
+	#setup_term # Just so stty doesnt break
+	#exit
+	draw_logo
+	f_leng=2 # f_leng has to be lines + 1 because ???
+	f_line1=''
+fi
+
+l_top=1  # Top line to draw
+p_top=-1 # Previos top ( to check scroll )
+s_mrg=3  # Scroll margin
+
+c_col=0 # Cursor column
+c_lin=1 # Cursor lin
+
+while [ "$key" != 'ctrl+Q' ]
+do
+	screen_buffer=''
+	if [ "$l_top" != "$p_top" ]
+	then
+		screen_buffer="$(draw_rule)"
+	fi
+	screen_buffer="$screen_buffer""$(draw_text)"
+	printf '%s\033[999B\r%s' "$screen_buffer" "$key L: $c_lin C: $c_col"
+	printf '\033''8'
+	getch
+	case "$key" in
+		'up')     c_lin=$(( c_lin - 1 )) ;;
+		'down')   c_lin=$(( c_lin + 1 )) ;;
+		'left')   c_col=$(( c_col - 1 )) ;;
+		'right')  c_col=$(( c_col + 1 )) ;;
+		'pageup') c_lin=$(( c_lin - lines )) ;;
+		'pagedn') c_lin=$(( c_lin + lines )) ;;
+		'ctrl+O')
+			prompt 'open: '
+			[ -e "$l_temp" ] && open_file "$l_temp" ;;
+	esac
+
+	cursor_stuff
+	scroll_check
+
 done
 restore_term
