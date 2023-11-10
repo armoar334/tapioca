@@ -114,6 +114,8 @@ esc_decode() {
 	fi
 }
 
+# Text
+
 # pure posix equivalent to ${var//pattern/replace}
 replace_all() {
 	r_side="$1"
@@ -131,6 +133,32 @@ replace_all() {
 		r_side="${r_side#*$2}"
 	done
 }
+
+insert_str() {
+	eval 'l_temp="${f_line'"$c_lin"'}"'
+	l_temp_two="$l_temp"
+	while [ ${#l_temp_two} -gt "$c_col" ]
+	do
+		l_temp_two="${l_temp_two%?}"
+	done
+	l_temp="$l_temp_two""$1""${l_temp#"$l_temp_two"}"
+	eval 'f_line'$c_lin'="$l_temp"'
+}
+
+back_space() {
+	eval 'l_temp="${f_line'"$c_lin"'}"'
+	l_temp_two="$l_temp"
+	while [ ${#l_temp} -gt "$c_col" ]
+	do
+		l_temp="${l_temp%?}"
+	done
+	l_temp_two="${l_temp_two#"$l_temp"}"
+	l_temp="${l_temp%?}"
+	l_temp="$l_temp""$l_temp_two"
+	eval 'f_line'$c_lin'="$l_temp"'	
+}
+
+# UI
 
 draw_rule() {
 	printf '\033[H'
@@ -198,6 +226,26 @@ draw_text() {
 	done
 }
 
+colorise() {
+	l_left="$1"
+	l_right="$1"
+	l_middle="$1"
+	l_word="$2"
+	l_color="$3"
+	while [ -n "$l_right" ]
+	do
+		l_left="${l_right%%}"
+	done
+}
+
+bottom_bar() {
+	printf '\033[%sH%s%-*s%s' "$lines" "${inv}" "$columns" "$1" "${end}"
+}
+
+error_bar() {
+	printf '\033[%sH%s%-*s%s' "$lines" "${red}${inv}" "$columns" "$1" "${end}"
+}
+
 draw_logo() {
 	logo=$(cat <<-EOF
  ${red} .. ... . ${end}
@@ -206,6 +254,7 @@ draw_logo() {
  ${end} \______/ ${end}
 
 ^O Open file
+* Scratchpad
   ^Q Quit
 	EOF
 	)
@@ -294,14 +343,20 @@ scroll_check() {
 }
 
 open_file() {
-	file_raw="$(cat "$1")"
+	prompt ' open: '
+	[ -e "$l_temp" ] && b_raw="$(cat "$l_temp")"
+	reint_buff "$b_raw"
+}
+
+reint_buff() {
+	b_raw="$1"
 	f_leng=1
 	while IFS= read -r line
 	do
 		eval "f_line""$f_leng""="'$line'
 		f_leng=$(( f_leng + 1 ))
 	done <<EOF
-$file_raw
+$b_raw
 EOF
 }
 
@@ -314,7 +369,7 @@ prompt() {
 	do
 		printf '\r%s%-*s\r%s%s' "${inv}" "$columns" '' "$1" "$p_lin" "${end}"
 		getch
-		case "$key" in
+ 		case "$key" in
 			'left'  )
 				[ "$p_col" -gt 1 ] && p_col=$(( p_col - 1 )) ;;
 			'right')
@@ -330,7 +385,6 @@ prompt() {
 
 # Main
 
-
 setup_term
 sizeof_term
 
@@ -338,15 +392,20 @@ if [ "$#" -gt 0 ]
 then
 	for item in "$@"
 	do
-		[ -e "$item" ] && open_file "$item"
+		[ -e "$item" ] && b_raw="$(cat "$item")" && reint_buff "$b_raw"
 	done
 else
 	#echo "No file DICKHEAD"
-	#setup_term # Just so stty doesnt break
-	#exit
 	draw_logo
 	f_leng=2 # f_leng has to be lines + 1 because ???
 	f_line1=''
+	getch
+	case "$key" in
+		'ctrl+Q') exit ;;
+		'ctrl+O')
+			open_file ;;
+		'newline') ;;
+	esac
 fi
 
 l_top=1  # Top line to draw
@@ -363,8 +422,8 @@ do
 	then
 		screen_buffer="$(draw_rule)"
 	fi
-	screen_buffer="$screen_buffer""$(draw_text)"
-	printf '%s\033[999B\r%s' "$screen_buffer" "$key L: $c_lin C: $c_col"
+	screen_buffer="$screen_buffer""$(draw_text)$(bottom_bar " $key L: $c_lin C: $c_col T: $f_leng")"
+	printf '%s' "$screen_buffer" 
 	printf '\033''8'
 	getch
 	case "$key" in
@@ -375,8 +434,57 @@ do
 		'pageup') c_lin=$(( c_lin - lines )) ;;
 		'pagedn') c_lin=$(( c_lin + lines )) ;;
 		'ctrl+O')
-			prompt 'open: '
-			[ -e "$l_temp" ] && open_file "$l_temp" ;;
+			open_file
+			p_top=-1 ;;
+		'ctrl+P') # Source current buffer
+			b_raw=$(
+				count=1
+				while [ "$count" -lt "$f_leng" ]
+				do
+					eval 'printf "%s\\n" "$f_line'"$count"'"'
+					count=$(( count + 1 ))
+				done
+			)
+			eval "$b_raw" ;;
+		'ctrl+Q') ;; # Just so it doesnt trap it in error
+		[[:print:]])
+			insert_str "$key"
+			c_col=$(( c_col + 1 )) ;;
+		'space')
+			insert_str ' '
+			c_col=$(( c_col + 1 )) ;;
+		'tab')
+			insert_str "$tab"
+			c_col=$(( c_col + 1 )) ;;
+		'backspace')
+			back_space
+			c_col=$(( c_col - 1 )) ;;
+		'delete')
+			back_space ;;
+		'newline')
+			b_raw=$(
+				count=1
+				while [ "$count" -lt "$f_leng" ]
+				do
+					eval 'l_temp="$f_line'"$count"'"'
+					l_temp_two="$l_temp"
+					if [ "$count" = "$c_lin" ]
+					then
+						while [ ${#l_temp} -gt "$c_col" ]
+						do
+							l_temp="${l_temp%?}"
+						done
+						printf '%s\n%s\n' "$l_temp" "${l_temp_two#"$l_temp"}"
+					else
+						printf '%s\n' "$l_temp"
+					fi
+					count=$(( count + 1 ))
+				done
+			)
+			reint_buff "$b_raw" ;;
+		*)
+			error_bar " unknown key: $key"
+			getch ;;
 	esac
 
 	cursor_stuff
