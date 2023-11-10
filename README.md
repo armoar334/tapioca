@@ -1,5 +1,5 @@
 # Tapioca
-## A portable, lightweight text editor in nearly strict posix shell and non-GNU coreutils
+## A portable, lightweight text editor in POSIX awk and coreutils
 
 ## Intro
 Tapioca is built to be as portable as possible out of the box, without sacrificing usability.
