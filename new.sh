@@ -74,7 +74,7 @@ getch() {
 			[[:cntrl:]])
 				key=$(( $(printf '%d' "'$temp") + 64 ))
 				key=$( printf '%03o' "$key")
-				key='ctrl+'$( printf '\'"$key");;
+				key='ctrl+'$( printf "\\""$key");;
 			*) key='unknown' ;;
 		esac
 	done
