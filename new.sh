@@ -22,6 +22,26 @@ EOF
 	running=
 }
 
+get_env() {
+	# System + shell
+	envsh=$(ps -p $$)
+	envsh="${envsh##* }"
+	if [ -h "$(which "$envsh")" ]
+	then
+		envsh="$(readlink "$(which "$envsh")")"
+	fi
+
+	case "$(uname -a)" in
+		Linux*)   envos="linux"  ;;
+		Darwin*)  envos="macOS"  ;;
+		OpenBSD*) envos="openbsd";;
+		FreeBSD*) envos="freebsd";;
+		Serenity) envos="serenityOS" ;;
+		Plan9*)   envos="plan9" ;; # This ones a little optimistic
+		*) envos="unknown" ;;
+	esac	
+}
+
 setup_term() {
 	# Set escape sequence
 	escape=$(printf '\033')
@@ -74,7 +94,7 @@ getch() {
 			[[:cntrl:]])
 				key=$(( $(printf '%d' "'$temp") + 64 ))
 				key=$( printf '%03o' "$key")
-				key='ctrl+'$( printf "\\""$key");;
+				key='ctrl_'$( printf "\\""$key");;
 			*) key='unknown' ;;
 		esac
 	done
@@ -86,13 +106,13 @@ esc_decode() {
 	case "$code" in
 		*[A-Z]|*'~') # Only process when code is done
 		case "$code" in
-			*';2'*) dec_temp='shift+' ;;
-			*';3'*) dec_temp='alt+' ;;
-			*';4'*) dec_temp='alt+shift+' ;;
-			*';5'*) dec_temp='ctrl+' ;;
-			*';6'*) dec_temp='ctrl+shift+' ;;
-			*';7'*) dec_temp='ctrl+alt+' ;;
-			*';8'*) dec_temp='ctrl+alt+shift+' ;;
+			*';2'*) dec_temp='shift_' ;;
+			*';3'*) dec_temp='alt_' ;;
+			*';4'*) dec_temp='alt_shift_' ;;
+			*';5'*) dec_temp='ctrl_' ;;
+			*';6'*) dec_temp='ctrl_shift_' ;;
+			*';7'*) dec_temp='ctrl_alt_' ;;
+			*';8'*) dec_temp='ctrl_alt_shift_' ;;
 		esac
 		case "$code" in
 			$esc'['*'A')  key="$dec_temp""up" ;;
@@ -146,16 +166,22 @@ insert_str() {
 }
 
 back_space() {
-	eval 'l_temp="${f_line'"$c_lin"'}"'
-	l_temp_two="$l_temp"
-	while [ ${#l_temp} -gt "$c_col" ]
-	do
+	if [ "$c_col" -lt 1 ]
+	then
+		eval 'f_line'$((c_lin-1))'="$f_line'$((c_lin-1))'""$f_line'$c_lin'"'
+		eval 'f_line'$c_lin'=""'
+	else
+		eval 'l_temp="${f_line'"$c_lin"'}"'
+		l_temp_two="$l_temp"
+		while [ ${#l_temp} -gt "$c_col" ]
+		do
+			l_temp="${l_temp%?}"
+		done
+		l_temp_two="${l_temp_two#"$l_temp"}"
 		l_temp="${l_temp%?}"
-	done
-	l_temp_two="${l_temp_two#"$l_temp"}"
-	l_temp="${l_temp%?}"
-	l_temp="$l_temp""$l_temp_two"
-	eval 'f_line'$c_lin'="$l_temp"'	
+		l_temp="$l_temp""$l_temp_two"
+		eval 'f_line'$c_lin'="$l_temp"'
+	fi
 }
 
 # UI
@@ -167,6 +193,7 @@ draw_rule() {
 	l_blanks=0
 	while [ "$l_screen" -lt "$lines" ]
 	do
+		# Draw without line numbers (for wrapped lines etc)
 		if [ "$l_blanks" -gt 0 ]
 		then
 			printf '%s%*s%s \n' "${inv}" "${#f_leng}" '' "${end}"
@@ -178,8 +205,8 @@ draw_rule() {
 			l_temp=$(( ${#l_end} / columns ))
 			l_blanks="$l_temp"
 			l_ruler=$(( l_ruler + 1 ))
-		#else
-			#printf '\033[2K\n'
+		else
+			printf '\033[2K\n'
 		fi
 		l_screen=$(( l_screen + 1 ))
 	done
@@ -247,7 +274,7 @@ error_bar() {
 }
 
 draw_logo() {
-	logo=$(cat <<-EOF
+	logo="$(cat <<-EOF
  ${red} .. ... . ${end}
  ${yel}##########${end}
  ${end}\________/${end}
@@ -257,32 +284,15 @@ draw_logo() {
 * Scratchpad
   ^Q Quit
 	EOF
-	)
+)"
 
 	# Welcome
 	printf '\033[%s;%sH' "$(( ( lines / 2 ) - 4 ))" "$(( ( columns / 2 ) - 9 ))"
 	printf "%s${yel}%s${end}\n" 'welcome to ' 'tapioca'
 
-	# System + shell
-	cursh=$(ps -p $$)
-	cursh="${cursh##* }"
-	if [ -h "$(which "$cursh")" ]
-	then
-		cursh="$(readlink "$(which "$cursh")")"
-	fi
-
-	case "$(uname -a)" in
-		Linux*)   curos="linux"  ;;
-		Darwin*)  curos="macOS"  ;;
-		OpenBSD*) curos="openbsd";;
-		FreeBSD*) curos="freebsd";;
-		Serenity) curos="serenityOS" ;;
-		Plan9*)   curos="plan9" ;; # This ones a little optimistic
-		*) cursh="unknown" ;;
-	esac
-	l_temp="running under $cursh on $curos"
+	l_temp="running under $envsh on $envos"
 	printf '\033[%s;%sH' "$(( ( lines / 2 ) - 3 ))" "$(( ( columns / 2 ) - ( ${#l_temp} / 2 ) ))"
-	printf 'running under %s on %s' "${blu}$cursh${end}" "${red}$curos${end}"
+	printf 'running under %s on %s' "${blu}$envsh${end}" "${red}$envos${end}"
 
 	# logo
 	printf '\033[%sH' $(( ( lines / 2 ) - 2 ))
@@ -351,6 +361,8 @@ open_file() {
 reint_buff() {
 	b_raw="$1"
 	f_leng=1
+	oldifs=$IFS
+	IFS=
 	while IFS= read -r line
 	do
 		eval "f_line""$f_leng""="'$line'
@@ -358,6 +370,7 @@ reint_buff() {
 	done <<EOF
 $b_raw
 EOF
+	IFS="$oldifs"
 }
 
 prompt() {
@@ -385,6 +398,7 @@ prompt() {
 
 # Main
 
+get_env
 setup_term
 sizeof_term
 
@@ -415,7 +429,83 @@ s_mrg=3  # Scroll margin
 c_col=0 # Cursor column
 c_lin=1 # Cursor lin
 
-while [ "$key" != 'ctrl+Q' ]
+###################
+# Define keyhooks #
+###################
+
+keyhook_up() { 
+	c_lin=$(( c_lin - 1 ))
+}
+keyhook_down() {
+	c_lin=$(( c_lin + 1 ))
+}
+keyhook_left() {
+	c_col=$(( c_col - 1 ))
+}
+keyhook_right() {
+	c_col=$(( c_col + 1 ))
+}
+keyhook_pageup() {
+	c_lin=$(( c_lin - lines ))
+}
+keyhook_pagedn() {
+	c_lin=$(( c_lin + lines ))
+}
+keyhook_ctrl_O() {
+	open_file
+	p_top=-1
+}
+keyhook_ctrl_P() { # Source current buffer
+	b_raw=$(
+		count=1
+		while [ "$count" -lt "$f_leng" ]
+		do
+			eval 'printf "%s\\n" "$f_line'"$count"'"'
+			count=$(( count + 1 ))
+		done
+	)
+	eval "$b_raw"
+}
+	#	'ctrl+Q') ;; # Just so it doesnt trap it in error
+	#		insert_str "$tab"
+	#		c_col=$(( c_col + 1 )) ;;
+keyhook_backspace() {
+	back_space
+	c_col=$(( c_col - 1 ))
+}
+keyhook_delete() {
+	back_space
+}
+keyhook_newline() {
+	b_raw=$(
+		count=1
+		while [ "$count" -lt "$f_leng" ]
+		do
+			eval 'l_temp="$f_line'"$count"'"'
+			l_temp_two="$l_temp"
+			if [ "$count" = "$c_lin" ]
+			then
+				while [ ${#l_temp} -gt "$c_col" ]
+				do
+					l_temp="${l_temp%?}"
+				done
+				printf '%s\n%s\n' "$l_temp" "${l_temp_two#"$l_temp"}"
+			else
+				printf '%s\n' "$l_temp"
+			fi
+			count=$(( count + 1 ))
+		done
+	)
+	reint_buff "$b_raw"
+	c_col=0
+	c_lin=$(( c_lin + 1 ))
+}
+
+##########################
+# Stop defining keyhooks #
+##########################
+
+while [ "$key" != 'ctrl_Q' ]
 do
 	screen_buffer=''
 	if [ "$l_top" != "$p_top" ]
@@ -426,69 +516,29 @@ do
 	printf '%s' "$screen_buffer" 
 	printf '\033''8'
 	getch
-	case "$key" in
-		'up')     c_lin=$(( c_lin - 1 )) ;;
-		'down')   c_lin=$(( c_lin + 1 )) ;;
-		'left')   c_col=$(( c_col - 1 )) ;;
-		'right')  c_col=$(( c_col + 1 )) ;;
-		'pageup') c_lin=$(( c_lin - lines )) ;;
-		'pagedn') c_lin=$(( c_lin + lines )) ;;
-		'ctrl+O')
-			open_file
-			p_top=-1 ;;
-		'ctrl+P') # Source current buffer
-			b_raw=$(
-				count=1
-				while [ "$count" -lt "$f_leng" ]
-				do
-					eval 'printf "%s\\n" "$f_line'"$count"'"'
-					count=$(( count + 1 ))
-				done
-			)
-			eval "$b_raw" ;;
-		'ctrl+Q') ;; # Just so it doesnt trap it in error
-		[[:print:]])
-			insert_str "$key"
-			c_col=$(( c_col + 1 )) ;;
-		'space')
-			insert_str ' '
-			c_col=$(( c_col + 1 )) ;;
-		'tab')
-			insert_str "$tab"
-			c_col=$(( c_col + 1 )) ;;
-		'backspace')
-			back_space
-			c_col=$(( c_col - 1 )) ;;
-		'delete')
-			back_space ;;
-		'newline')
-			b_raw=$(
-				count=1
-				while [ "$count" -lt "$f_leng" ]
-				do
-					eval 'l_temp="$f_line'"$count"'"'
-					l_temp_two="$l_temp"
-					if [ "$count" = "$c_lin" ]
-					then
-						while [ ${#l_temp} -gt "$c_col" ]
-						do
-							l_temp="${l_temp%?}"
-						done
-						printf '%s\n%s\n' "$l_temp" "${l_temp_two#"$l_temp"}"
-					else
-						printf '%s\n' "$l_temp"
-					fi
-					count=$(( count + 1 ))
-				done
-			)
-			reint_buff "$b_raw" ;;
-		*)
-			error_bar " unknown key: $key"
-			getch ;;
-	esac
-
+	if [ "${#key}" -eq 1 ]
+	then
+		insert_str "$key"
+		c_col=$(( c_col + 1 ))
+	elif [ "$key" = 'space' ]
+	then
+		insert_str ' '
+		c_col=$(( c_col + 1 ))
+	elif [ "$key" = 'tab' ]
+	then
+		insert_str '	'
+		c_col=$(( c_col + 1 ))
+	elif command -v 'keyhook_'"$key" >/dev/null
+	then
+		eval 'keyhook_'"$key"
+	else
+		error_bar " unknown key: $key"
+	fi
 	cursor_stuff
 	scroll_check
 
 done
+
 restore_term
+
+
